@@ -24,6 +24,7 @@ namespace SharpBlueprint.Core.Tests
             Assert.IsTrue(!string.IsNullOrEmpty(result));
         }
 #else
+        [Fact]
         public void GetDotNetCountAsyncTest()
         {
             var client = new SimpleHttpClient();
