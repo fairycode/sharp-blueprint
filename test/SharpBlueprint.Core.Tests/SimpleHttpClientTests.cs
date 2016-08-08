@@ -33,7 +33,7 @@ namespace SharpBlueprint.Core.Tests
 
             Console.WriteLine(result);
 
-            Assert.True(!string.IsNullOrEmpty(result));
+            Assert.True(string.IsNullOrEmpty(result));
         }
 #endif
     }
