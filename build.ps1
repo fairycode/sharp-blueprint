@@ -1,4 +1,4 @@
-cls
+#cls
 
 #if ($LastExitCode -ne 0) { Write-Host "Error code:" $LastExitCode }
 
