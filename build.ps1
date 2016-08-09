@@ -2,6 +2,11 @@
 
 #if ($LastExitCode -ne 0) { Write-Host "Error code:" $LastExitCode }
 
+if ($env:APPVEYOR -eq "True")
+{
+    Write-Host "This is AppVeyor environment"
+}
+
 # '[p]sake' is the same as 'psake' but $Error is not polluted
 remove-module [p]sake
 

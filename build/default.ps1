@@ -78,7 +78,7 @@ task TestNUnit `
                                     -publishedTestsDirectory $publishedNUnitTestsDirectory `
                                     -testResultsDirectory $NUnitTestResultsDirectory
 
-    Exec { &$nunitExe $testAssemblies --result=$NUnitTestResultsDirectory\NUnit.xml }
+    Exec { &$nunitExe $testAssemblies --result=$NUnitTestResultsDirectory\NUnit.xml;format=AppVeyor }
 }
 
 task TestXUnit `
@@ -91,14 +91,14 @@ task TestXUnit `
                                     -publishedTestsDirectory $publishedxUnitTestsDirectory `
                                     -testResultsDirectory $xUnitTestResultsDirectory
 
-    Exec { &$xUnitExe $testAssemblies -xml $xUnitTestResultsDirectory\xUnit.xml -nologo -noshadow }
+    Exec { &$xUnitExe $testAssemblies /xml $xUnitTestResultsDirectory\xUnit.xml /appveyor }
 }
 
 task Test `
     -depends Compile, TestNUnit, TestXUnit `
     -description "Run unit tests"
 {
-  Write-Host "$testMessage"
+  
 }
 
 task Clean -description "Remove temporary files" {
