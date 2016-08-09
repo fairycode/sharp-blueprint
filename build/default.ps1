@@ -91,7 +91,7 @@ task TestXUnit `
                                     -publishedTestsDirectory $publishedxUnitTestsDirectory `
                                     -testResultsDirectory $xUnitTestResultsDirectory
 
-    Exec { &$xUnitExe $testAssemblies /xml $xUnitTestResultsDirectory\xUnit.xml }
+    Exec { &$xUnitExe $testAssemblies -xml $xUnitTestResultsDirectory\xUnit.xml -nologo -noshadow }
 }
 
 task Test `
