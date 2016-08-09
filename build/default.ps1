@@ -78,7 +78,7 @@ task TestNUnit `
                                     -publishedTestsDirectory $publishedNUnitTestsDirectory `
                                     -testResultsDirectory $NUnitTestResultsDirectory
 
-    Exec { &$nunitExe $testAssemblies --result=$NUnitTestResultsDirectory\NUnit.xml;format=AppVeyor }
+    Exec { &$nunitExe $testAssemblies --result=$NUnitTestResultsDirectory\NUnit.xml }
 }
 
 task TestXUnit `
@@ -98,7 +98,13 @@ task Test `
     -depends Compile, TestNUnit, TestXUnit `
     -description "Run unit tests"
 {
-  
+    Write-Host $testMessage
+    if ($env:APPVEYOR -eq "True")
+    {
+        Write-Host "Upload test results to AppVeyor"
+        $wc = New-Object 'System.Net.WebClient'
+        $wc.UploadFile("https://ci.appveyor.com/api/testresults/xunit/$($env:APPVEYOR_JOB_ID)", (Resolve-Path $xUnitTestResultsDirectory\xUnit.xml))
+    }
 }
 
 task Clean -description "Remove temporary files" {
