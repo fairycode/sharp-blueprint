@@ -40,7 +40,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="SimpleHttpClientTests.NET35.cs" />
+    <Compile Include="SimpleHttpClientTests.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.SharpBlueprint.Core.Net35.Tests.config" />
