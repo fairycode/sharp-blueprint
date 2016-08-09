@@ -91,7 +91,7 @@ task TestXUnit `
                                     -publishedTestsDirectory $publishedxUnitTestsDirectory `
                                     -testResultsDirectory $xUnitTestResultsDirectory
 
-    Exec { &$xUnitExe $testAssemblies /xml $xUnitTestResultsDirectory\xUnit.xml /appveyor }
+    Exec { &$xUnitExe $testAssemblies /xml $xUnitTestResultsDirectory\xUnit.xml }
 }
 
 task Test `
