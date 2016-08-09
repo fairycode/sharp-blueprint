@@ -98,7 +98,7 @@ task Test `
     -depends Compile, TestNUnit, TestXUnit `
     -description "Run unit tests"
 {
-  Write-Output $testMessage
+  Write-Host "$testMessage"
 }
 
 task Clean -description "Remove temporary files" {
