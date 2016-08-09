@@ -1,5 +1,5 @@
-﻿#if NET35
-using System;
+﻿using System;
+#if NET35
 using System.Net;
 #else
 using System.Net.Http;
@@ -37,7 +37,7 @@ namespace SharpBlueprint.Core
 
             var dotNetCount = Regex.Matches(result, ".NET").Count;
 
-            return $"Dotnet Foundation mentions .NET {dotNetCount} times!";
+            return string.Format("Dotnet Foundation mentions .NET {0} times!", dotNetCount);
         }
 #else
         // .NET 4.5+ can use async/await!
@@ -50,7 +50,7 @@ namespace SharpBlueprint.Core
 
             var dotNetCount = Regex.Matches(result, ".NET").Count;
 
-            return $"dotnetfoundation.orgmentions .NET {dotNetCount} times in its HTML!";
+            return string.Format("dotnetfoundation.orgmentions .NET {0} times in its HTML!", dotNetCount);
         }
 #endif
     }
