@@ -1,6 +1,10 @@
-#cls
+. (".\build\restore_packages.ps1")
 
-#if ($LastExitCode -ne 0) { Write-Host "Error code:" $LastExitCode }
+(Restore-Packages "SharpBlueprint.sln" "packages.config")
+(Restore-Packages "SharpBlueprint.sln" "test\SharpBlueprint.Core.Tests\packages.SharpBlueprint.Core.Tests.config")
+(Restore-Packages "SharpBlueprint.sln" "test\SharpBlueprint.Core.Tests\packages.SharpBlueprint.Core.Net35.Tests.config")
+
+if ($lastExitCode -ne 0) { exit $lastExitCode }
 
 if ($env:APPVEYOR -eq "True")
 {
