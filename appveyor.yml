@@ -6,8 +6,6 @@ branches:
   - master
 nuget:  
   disable_publish_on_pr: true
-install:
-  nuget restore
 build_script:  
 - ps: .\build.ps1
 test: off  
