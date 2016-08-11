@@ -1,8 +1,9 @@
 . (".\build\restore_packages.ps1")
 
 (Restore-Packages "SharpBlueprint.sln" "packages.config")
-(Restore-Packages "SharpBlueprint.sln" "test\SharpBlueprint.Core.Tests\packages.SharpBlueprint.Core.Tests.config")
-(Restore-Packages "SharpBlueprint.sln" "test\SharpBlueprint.Core.Tests\packages.SharpBlueprint.Core.Net35.Tests.config")
+(Restore-Packages "SharpBlueprint.sln" "SharpBlueprint.sln")
+#(Restore-Packages "SharpBlueprint.sln" "test\SharpBlueprint.Core.Tests\packages.SharpBlueprint.Core.Tests.config")
+#(Restore-Packages "SharpBlueprint.sln" "test\SharpBlueprint.Core.Tests\packages.SharpBlueprint.Core.Net35.Tests.config")
 
 if ($lastExitCode -ne 0) { exit $lastExitCode }
 

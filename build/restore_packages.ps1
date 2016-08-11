@@ -6,8 +6,6 @@ function Restore-Packages
         [Parameter(Position=1,Mandatory=1)]$packageConfigFile
     )
 
-    Assert(Test-Path $solutionFile) "Solution file could not be found"
-
     $solutionDirectory = (Get-Item $solutionFile).DirectoryName
 
     Write-Host $solutionDirectory
