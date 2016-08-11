@@ -1,3 +1,33 @@
+#
+# TODO:
+#
+function Get-Nuget {
+    [CmdletBinding()]
+    param (
+        [Parameter(Position=0,Mandatory=1)][string]$rootDirectory
+    )
+
+    $nugetExe = "$rootDirectory\tools\nuget.exe"
+    $nugetDistUrl = "https://dist.nuget.org/win-x86-commandline/v3.4.4/NuGet.exe"
+
+    if (!(Test-Path $nugetExe)) {
+        $toolsDirectory = split-path -parent $nugetExe
+
+        if (!(Test-Path $toolsDirectory)) {
+            New-Item $toolsDirectory -ItemType Directory | Out-Null
+        }
+
+        Write-Host "Downloading NuGet.exe (into $nugetExe)"
+
+        Invoke-WebRequest $nugetDistUrl -OutFile $nugetExe
+    }
+
+    return $nugetExe
+}
+
+#
+# TODO:
+#
 function Find-PackagePath
 {
     [CmdletBinding()]
@@ -6,9 +36,12 @@ function Find-PackagePath
         [Parameter(Position=1,Mandatory=1)]$packageName
     )
 
-    return (Get-ChildItem ($packagesPath + "\" + $packageName + "*")).FullName | Sort-Object $_ | select -last 1
+    return (Get-ChildItem ($packagesPath + "\" + $packageName + "*")).FullName | Sort-Object $_ | Select-Object -Last 1
 }
 
+#
+# TODO:
+#
 function Prepare-Tests
 {
     [CmdletBinding()]
@@ -44,4 +77,20 @@ function Prepare-Tests
     $testAssemblies = [string]::Join(" ", $testAssembliesPaths)
 
     return $testAssemblies
+}
+
+#
+# TODO:
+#
+function Upload-TestResults
+{
+    [CmdletBinding()]
+    param(
+        [Parameter(Position=0,Mandatory=1)]$destinationUrl,
+        [Parameter(Position=1,Mandatory=1)]$testResulsFile
+    )
+
+    Write-Host "Upload test results to AppVeyor"
+    $client = New-Object 'System.Net.WebClient'
+    $client.UploadFile($destinationUrl, $testResulsFile)
 }

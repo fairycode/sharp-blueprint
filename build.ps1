@@ -1,37 +1,45 @@
-. (".\build\restore_packages.ps1")
+. build\helpers.ps1
 
-(Restore-Packages "SharpBlueprint.sln" "packages.config")
-(Restore-Packages "SharpBlueprint.sln" "SharpBlueprint.sln")
-#(Restore-Packages "SharpBlueprint.sln" "test\SharpBlueprint.Core.Tests\packages.SharpBlueprint.Core.Tests.config")
-#(Restore-Packages "SharpBlueprint.sln" "test\SharpBlueprint.Core.Tests\packages.SharpBlueprint.Core.Net35.Tests.config")
+# script "build.ps1" should be in solution root folder
+$solutionRoot = (Resolve-Path .)
 
-if ($lastExitCode -ne 0) { exit $lastExitCode }
+# init NuGet exe
+$nugetExe = Get-Nuget $solutionRoot
 
-if ($env:APPVEYOR -eq "True")
-{
-    Write-Host "This is AppVeyor environment"
+@(
+    # packages used mainly in build process
+    ".\packages.config",
+
+    # project-specific packages
+    # TODO: rewrite so config files are picked up automatically for projects defined in solution
+    ".\test\SharpBlueprint.Core.Tests\packages.SharpBlueprint.Core.Tests.config",
+    ".\test\SharpBlueprint.Core.Tests\packages.SharpBlueprint.Core.Net35.Tests.config"
+
+) | foreach {
+    # packages are restored into single "packages" folder in solution's root
+    &$nugetExe restore (Resolve-Path $_) -PackagesDirectory "$solutionRoot\packages"
 }
 
-# '[p]sake' is the same as 'psake' but $Error is not polluted
+#
+# ensure that psake is not in context for safe importing
 remove-module [p]sake
 
-# find psake's path
-$psakeModule = (Get-ChildItem (".\packages\psake*\tools\psake.psm1")).FullName | Sort-Object $_ | Select -Last 1
- 
-#if ($LastExitCode -ne 0) { $host.SetShouldExit($LastExitCode) }
+#
+# TODO: ...
+#
+Import-Module ((Find-PackagePath ".\packages\" "psake") + "\tools\psake.psm1")
 
-Import-Module $psakeModule
-
-# you can put arguments to task in multiple lines using `
+# TODO: consider to get hard-coded params like"Release", "Any CPU" etc. from environment (ex. AppVeyor) 
 Invoke-psake -buildFile .\build\default.ps1 `
              -taskList Test `
-             -properties @{ 
-                 "buildConfiguration" = "Debug"
+             -properties @{
+                 "buildConfiguration" = "Release"
                  "buildPlatform" = "Any CPU"} `
-             -parameters @{ 
+             -parameters @{
                  "solutionFile" = "..\SharpBlueprint.sln"}
 
 Write-Host "Build exit code:" $LastExitCode
 
 # Propagating the exit code so that builds actually fail when there is a problem
 exit $LastExitCode
+#>
