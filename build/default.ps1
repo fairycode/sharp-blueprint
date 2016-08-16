@@ -1,8 +1,6 @@
-Include ".\helpers.ps1"
+Include ".\helpers.ps1"
 
 properties {
-    $testMessage = 'Executed Test!'
-    $cleanMessage = 'Executed Clean!'
 
     $solutionDirectory = (Get-Item $solutionFile).DirectoryName
     $outputDirectory= "$solutionDirectory\.build"
@@ -21,6 +19,7 @@ properties {
     $packagesPath = "$solutionDirectory\packages"
     $NUnitExe = (Find-PackagePath $packagesPath "NUnit.ConsoleRunner" ) + "\tools\nunit3-console.exe"
     $xUnitExe = (Find-PackagePath $packagesPath "xUnit.Runner.Console" ) + "\Tools\xunit.console.exe"
+
 }
 
 task default -depends Test
@@ -63,8 +62,10 @@ task Compile `
     -requiredVariables solutionFile, buildConfiguration, buildPlatform, temporaryOutputDirectory `
 { 
     Write-Host "Building solution $solutionFile"
-    #msbuild $SolutionFile "/p:Configuration=$buildConfiguration;Platform=$buildPlatform;OutDir=$temporaryOutputDirectory"
 
+    # MSBuild is still the best tool for building .NET projects
+    # TODO: Consider case when MSBuild is not available on machine... Get from NuGet repo???
+    # msbuild $SolutionFile "/p:Configuration=$buildConfiguration;Platform=$buildPlatform;OutDir=$temporaryOutputDirectory"
     Exec { msbuild $SolutionFile "/p:Configuration=$buildConfiguration;Platform=$buildPlatform;OutDir=$temporaryOutputDirectory" }
 }
 
@@ -78,10 +79,15 @@ task TestNUnit `
                                     -publishedTestsDirectory $publishedNUnitTestsDirectory `
                                     -testResultsDirectory $NUnitTestResultsDirectory
 
+    # TODO: Check what other options in NUnit test runner are available
     Exec { &$nunitExe $testAssemblies --result=$NUnitTestResultsDirectory\NUnit.xml }
+
+    if ($env:APPVEYOR -eq $true) {
+        Upload-TestResults "https://ci.appveyor.com/api/testresults/nunit3/$($env:APPVEYOR_JOB_ID)" (Resolve-Path $NUnitTestResultsDirectory\NUnit.xml)
+    }
 }
 
-task TestXUnit `
+task TestxUnit `
     -depends Compile `
     -description "Run xUnit tests" `
     -precondition { return Test-Path $publishedxUnitTestsDirectory } `
@@ -91,16 +97,21 @@ task TestXUnit `
                                     -publishedTestsDirectory $publishedxUnitTestsDirectory `
                                     -testResultsDirectory $xUnitTestResultsDirectory
 
+    # TODO: Check what other options in xUnit test runner are available
     Exec { &$xUnitExe $testAssemblies -xml $xUnitTestResultsDirectory\xUnit.xml -nologo -noshadow }
+
+    if ($env:APPVEYOR -eq $true) {
+        Upload-TestResults "https://ci.appveyor.com/api/testresults/xunit/$($env:APPVEYOR_JOB_ID)" (Resolve-Path $xUnitTestResultsDirectory\xUnit.xml)
+    }
 }
 
 task Test `
-    -depends Compile, TestNUnit, TestXUnit `
+    -depends Compile, TestNUnit, TestxUnit `
     -description "Run unit tests"
 {
-  Write-Host $testMessage
+    Write-Host 'Executed Test!'
 }
 
 task Clean -description "Remove temporary files" {
-  Write-Host $cleanMessage
+  Write-Host 'Executed Clean!'
 }

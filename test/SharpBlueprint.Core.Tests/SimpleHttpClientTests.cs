@@ -19,7 +19,7 @@ namespace SharpBlueprint.Core.Tests
             var client = new SimpleHttpClient();
             var result = client.GetDotNetCount();
 
-            Console.WriteLine(result);
+            Console.WriteLine("GetDotNetCountTest: " + result);
 
             Assert.IsTrue(!string.IsNullOrEmpty(result));
         }
@@ -32,7 +32,7 @@ namespace SharpBlueprint.Core.Tests
 
             var result = resultTask.Result;
 
-            Console.WriteLine(result);
+            Console.WriteLine("GetDotNetCountAsyncTest: " + result);
 
             Assert.True(!string.IsNullOrEmpty(result));
         }
