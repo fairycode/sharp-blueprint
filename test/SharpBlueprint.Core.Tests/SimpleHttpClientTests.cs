@@ -33,7 +33,6 @@ namespace SharpBlueprint.Core.Tests
             var result = resultTask.Result;
 
             Console.WriteLine("GetDotNetCountAsyncTest: " + result);
-            Console.WriteLine();
 
             Assert.True(!string.IsNullOrEmpty(result));
         }
