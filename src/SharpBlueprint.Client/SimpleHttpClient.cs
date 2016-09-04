@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 #endif
 using System.Text.RegularExpressions;
 
-namespace SharpBlueprint.Core
+namespace SharpBlueprint.Client
 {
     /// <summary>
     /// 

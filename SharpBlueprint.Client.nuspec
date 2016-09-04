@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<package>
+  <metadata>
+    <id>SharpBlueprint.Client</id>
+    <version>0.1.{build}</version>
+    <title>SharpBlueprint.Client</title>
+    <authors>FairyCoder</authors>
+    <owners>FairyCoder</owners>
+    <projectUrl>https://github.com/fairycode/sharp-blueprint</projectUrl>
+    <description>SharpBlueprint .NET Client</description>
+    <releaseNotes>{release notes}</releaseNotes>
+    <copyright>Copyright © 2016 FairyCoder</copyright>
+  </metadata>
+  <files>
+    <file src="SharpBlueprint.Client\SharpBlueprint.Client.dll" target="lib\net452" />
+    <file src="SharpBlueprint.Client\SharpBlueprint.Client.pdb" target="lib\net452" />
+    <file src="SharpBlueprint.Client_Net35\SharpBlueprint.Client.dll" target="lib\net35" />
+    <file src="SharpBlueprint.Client_Net35\SharpBlueprint.Client.pdb" target="lib\net35" />
+  </files>
+</package>
