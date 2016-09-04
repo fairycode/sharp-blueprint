@@ -41,8 +41,8 @@
     <Reference Include="System.Web" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="..\SharpBlueprint.Client\SimpleHttpClient.cs">
-      <Link>SimpleHttpClient.cs</Link>
+    <Compile Include="..\SharpBlueprint.Client\SimpleHttpClientTests.cs">
+      <Link>SimpleHttpClientTests.cs</Link>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
