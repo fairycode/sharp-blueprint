@@ -1,4 +1,5 @@
 ﻿using System;
+using SharpBlueprint.Client;
 #if NET35
 using NUnit.Framework;
 #else
