@@ -1,16 +1,16 @@
-﻿using System.Reflection;
-using System.Runtime.CompilerServices;
+﻿using System;
+using System.Reflection;
 using System.Runtime.InteropServices;
 
 // General Information about an assembly is controlled through the following 
 // set of attributes. Change these attribute values to modify the information
 // associated with an assembly.
-[assembly: AssemblyTitle("SharpBlueprint.Core.Tests")]
-[assembly: AssemblyDescription("")]
+[assembly: AssemblyTitle("SharpBlueprint.Client.Tests")]
+[assembly: AssemblyDescription("Unit tests for SharpBlueprint .NET Client")]
 [assembly: AssemblyConfiguration("")]
-[assembly: AssemblyCompany("")]
-[assembly: AssemblyProduct("")]
-[assembly: AssemblyCopyright("Copyright © 2016")]
+[assembly: AssemblyCompany("FairyCoder")]
+[assembly: AssemblyProduct("SharpBlueprint.Client.Tests")]
+[assembly: AssemblyCopyright("Copyright © 2016 FairyCoder")]
 [assembly: AssemblyTrademark("")]
 [assembly: AssemblyCulture("")]
 
@@ -18,9 +18,10 @@ using System.Runtime.InteropServices;
 // to COM components.  If you need to access a type in this assembly from 
 // COM, set the ComVisible attribute to true on that type.
 [assembly: ComVisible(false)]
+[assembly: CLSCompliant(true)]
 
 // The following GUID is for the ID of the typelib if this project is exposed to COM
-[assembly: Guid("4dc57741-965d-4720-83ff-addecc9cea14")]
+[assembly: Guid("9de7a71a-4154-4887-9715-46b86629b051")]
 
 // Version information for an assembly consists of the following four values:
 //

@@ -5,7 +5,7 @@ using NUnit.Framework;
 using Xunit;
 #endif
 
-namespace SharpBlueprint.Core.Tests
+namespace SharpBlueprint.Client.Tests
 {
 #if NET35
     [TestFixture]

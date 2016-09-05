@@ -1,0 +1,40 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
+  <PropertyGroup>
+    <PrepareForRunDependsOn>
+      $(PrepareForRunDependsOn);
+      _PublishAssemblies
+    </PrepareForRunDependsOn>
+  </PropertyGroup>
+  <!--
+    ========================================================
+    _PublishAssemblies
+
+    Target copies the build outputs along with the content
+    files into a PublishAssembliesDirectory folder.
+    ========================================================
+  -->
+  <Target Name="_PublishAssemblies" Condition="'$(CustomOutDir)' != ''">
+    <!-- Log task -->
+    <Message Text="Publishing assemblies for $(MSBuildProjectName)"/>
+    <!-- Create the output folder -->
+    <MakeDir Directories="$(PublishAssembliesDirectory)"/>
+    <!-- Copy build outputs -->
+    <Copy SourceFiles="@(IntermediateAssembly)" DestinationFolder="$(PublishAssembliesDirectory)" SkipUnchangedFiles="true"/>
+    <Copy SourceFiles="@(AddModules)" DestinationFolder="$(PublishAssembliesDirectory)" SkipUnchangedFiles="true"/>
+    <Copy SourceFiles="$(IntermediateOutputPath)$(_SGenDllName)" DestinationFolder="$(PublishAssembliesDirectory)\%(Content.SubFolder)%(Content.RecursiveDir)" SkipUnchangedFiles="true" Condition="'$(_SGenDllCreated)'=='true'"/>
+    <Copy SourceFiles="$(IntermediateOutputPath)$(TargetName).pdb" DestinationFolder="$(PublishAssembliesDirectory)" SkipUnchangedFiles="true" Condition="'$(_DebugSymbolsProduced)'=='true'"/>
+    <Copy SourceFiles="@(DocFileItem)" DestinationFolder="$(PublishAssembliesDirectory)" SkipUnchangedFiles="true" Condition="'$(_DocumentationFileProduced)'=='true'"/>
+    <Copy SourceFiles="@(IntermediateSatelliteAssembliesWithTargetPath)" DestinationFiles="@(IntermediateSatelliteAssembliesWithTargetPath-&gt;'$(PublishAssembliesDirectory)\%(Culture)\$(TargetName).resources.dll')" SkipUnchangedFiles="true"/>
+    <Copy SourceFiles="@(ReferenceComWrappersToCopyLocal); @(ResolvedIsolatedComModules); @(_DeploymentLooseManifestFile); @(NativeReferenceFile)" DestinationFolder="$(PublishAssembliesDirectory)" SkipUnchangedFiles="true"/>
+    <!-- Copy any referenced assemblies -->
+    <Copy SourceFiles="@(ReferenceCopyLocalPaths)" DestinationFiles="@(ReferenceCopyLocalPaths-&gt;'$(PublishAssembliesDirectory)\%(DestinationSubDirectory)%(Filename)%(Extension)')" SkipUnchangedFiles="true"/>
+    <!-- Copy content files recursively -->
+    <Copy SourceFiles="@(Content)" Condition="'%(Content.Link)' == ''" DestinationFolder="$(PublishAssembliesDirectory)\%(Content.RelativeDir)" SkipUnchangedFiles="true"/>
+    <Copy SourceFiles="@(Content)" Condition="'%(Content.Link)' != ''" DestinationFiles="$(PublishAssembliesDirectory)\%(Content.Link)" SkipUnchangedFiles="true"/>
+    <!-- Copy items that have been marked to be copied to the output folder -->
+    <Copy SourceFiles="@(_SourceItemsToCopyToOutputDirectory)" DestinationFolder="$(PublishAssembliesDirectory)" SkipUnchangedFiles="true"/>
+    <Copy SourceFiles="@(_SourceItemsToCopyToOutputDirectoryAlways)" DestinationFolder="$(PublishAssembliesDirectory)" SkipUnchangedFiles="false"/>
+    <!-- Copy items that need to be bin deployed -->
+    <Copy SourceFiles="@(_binDeployableAssemblies)" DestinationFolder="$(PublishAssembliesDirectory)\%(RecursiveDir)" SkipUnchangedFiles="true"/>
+  </Target>
+</Project>

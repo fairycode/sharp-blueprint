@@ -4,20 +4,24 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{DF996117-2265-440E-9095-1162D58FE88B}</ProjectGuid>
+    <ProjectGuid>{9DE7A71A-4154-4887-9715-46B86629B051}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>SharpBlueprint.Core.Tests</RootNamespace>
-    <AssemblyName>SharpBlueprint.Core.Net35.Tests</AssemblyName>
+    <RootNamespace>SharpBlueprint.Client.Tests</RootNamespace>
+    <AssemblyName>SharpBlueprint.Client.Tests</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(CustomOutDir)' != '' ">
+    <OutDir>$(CustomOutDir)\$(MSBuildProjectName)</OutDir>
+    <PublishAssembliesDirectory>$(CustomOutDir)\_PublishedNUnitTests\$(RootNamespace)</PublishAssembliesDirectory>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>TRACE;DEBUG;NET35</DefineConstants>
+    <DefineConstants>DEBUG;TRACE;NET35</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
@@ -39,20 +43,22 @@
     <Reference Include="System.Data" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="..\SharpBlueprint.Client.Tests\SimpleHttpClientTests.cs">
+      <Link>SimpleHttpClientTests.cs</Link>
+    </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="SimpleHttpClientTests.cs" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="packages.SharpBlueprint.Core.Net35.Tests.config" />
+    <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\src\SharpBlueprint.Core\SharpBlueprint.Core.Net35.csproj">
-      <Project>{74cebdbc-4a25-47d9-9a02-aae2a81d0542}</Project>
-      <Name>SharpBlueprint.Core.Net35</Name>
+    <ProjectReference Include="..\..\src\SharpBlueprint.Client_Net35\SharpBlueprint.Client_Net35.csproj">
+      <Project>{4caa4d42-b7d1-4ecb-9b81-9c0ed159113c}</Project>
+      <Name>SharpBlueprint.Client_Net35</Name>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
-  <Import Project="..\..\build\MSBuild\NUnitBuild.targets"/>
+  <Import Project="..\..\build\PublishAssemblies.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
   <Target Name="BeforeBuild">

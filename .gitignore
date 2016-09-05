@@ -90,3 +90,4 @@ UpgradeLog*.XML
 UpgradeLog*.htm
 
 .build
+.DS_Store

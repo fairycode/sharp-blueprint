@@ -1,5 +1,5 @@
-﻿using System;
-#if NET35
+﻿#if NET35
+using System;
 using System.Net;
 #else
 using System.Net.Http;
@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 #endif
 using System.Text.RegularExpressions;
 
-namespace SharpBlueprint.Core
+namespace SharpBlueprint.Client
 {
     /// <summary>
     /// 
