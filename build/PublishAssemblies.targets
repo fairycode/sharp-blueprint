@@ -13,7 +13,7 @@
     files into a PublishAssembliesDirectory folder.
     ========================================================
   -->
-  <Target Name="_PublishAssemblies" Condition="'$(OutDir)' != '$(OutputPath)'">
+  <Target Name="_PublishAssemblies" Condition="'$(CustomOutDir)' != ''">
     <!-- Log task -->
     <Message Text="Publishing assemblies for $(MSBuildProjectName)"/>
     <!-- Create the output folder -->

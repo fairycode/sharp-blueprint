@@ -11,7 +11,10 @@
     <AssemblyName>SharpBlueprint.Client</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <PublishAssembliesDirectory>$(OutDir)\_PublishedLibraries\$(MSBuildProjectName)</PublishAssembliesDirectory>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(CustomOutDir)' != '' ">
+    <OutDir>$(CustomOutDir)\$(MSBuildProjectName)</OutDir>
+    <PublishAssembliesDirectory>$(CustomOutDir)\_PublishedLibraries\$(MSBuildProjectName)</PublishAssembliesDirectory>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>

@@ -1,12 +1,11 @@
 ﻿using System;
-using SharpBlueprint.Client;
 #if NET35
 using NUnit.Framework;
 #else
 using Xunit;
 #endif
 
-namespace SharpBlueprint.Core.Tests
+namespace SharpBlueprint.Client.Tests
 {
 #if NET35
     [TestFixture]

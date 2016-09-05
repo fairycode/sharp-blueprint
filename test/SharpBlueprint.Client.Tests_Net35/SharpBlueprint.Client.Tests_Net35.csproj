@@ -11,7 +11,10 @@
     <AssemblyName>SharpBlueprint.Client.Tests</AssemblyName>
     <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
-    <PublishAssembliesDirectory>$(OutDir)\_PublishedNUnitTests\$(RootNamespace)</PublishAssembliesDirectory>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(CustomOutDir)' != '' ">
+    <OutDir>$(CustomOutDir)\$(MSBuildProjectName)</OutDir>
+    <PublishAssembliesDirectory>$(CustomOutDir)\_PublishedNUnitTests\$(RootNamespace)</PublishAssembliesDirectory>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>

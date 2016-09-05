@@ -82,7 +82,7 @@ task Compile `
     # MSBuild is still the best tool for building .NET projects.
     # TODO: Consider case when MSBuild is not available on machine... Get it from NuGet repo???
     # msbuild $SolutionFile "/p:Configuration=$buildConfiguration;Platform=$buildPlatform;OutDir=$temporaryOutputDirectory"
-    Exec { msbuild $SolutionFile "/p:Configuration=$buildConfiguration;Platform=$buildPlatform;OutDir=$temporaryOutputDirectory" }
+    Exec { msbuild $SolutionFile "/p:Configuration=$buildConfiguration;Platform=$buildPlatform;CustomOutDir=$temporaryOutputDirectory" }
 }
 
 task TestNUnit `
