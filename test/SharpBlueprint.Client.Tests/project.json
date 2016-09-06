@@ -4,19 +4,39 @@
   "copyright": "Copyright (c) 2016 FairyCoder",
   "version": "0.1.0-*",
 
-  "frameworks": {
-    "netstandard1.6": {
+  "dependencies": {
+    "SharpBlueprint.Client": {
+      "target": "project"
+    }
+  },
+
+  "configurations": {
+    "Release": {
       "buildOptions": {
-        "debugType": "portable",
+        "warningsAsErrors": true
+      }
+    }
+  },
+
+  "frameworks": {
+
+    "netcoreapp1.0": {
+      "buildOptions": {
         "define": [
           "NETCORE"
         ]
       },
       "imports": "dnxcore50",
       "dependencies": {
-        "NETStandard.Library": "1.6.0"
+        "Microsoft.NETCore.App": {
+          "type": "platform",
+          "version": "1.0.0"
+        },
+        "xunit": "2.2.0-beta2-build3300",
+        "dotnet-test-xunit": "2.2.0-preview2-build1029"
       }
     },
+
     "net452": {
       "frameworkAssemblies": {
         "System": {
@@ -31,6 +51,9 @@
         "System.Net.Http": {
           "type": "build"
         },
+        "System.Runtime": {
+          "type": "build"
+        },
         "System.Web": {
           "type": "build"
         }
@@ -42,31 +65,11 @@
         "xunit.assert": "2.1.0",
         "xunit.core": "2.1.0",
         "xunit.extensibility.core": "2.1.0",
-        "xunit.extensibility.execution": "2.1.0"
-      }
-    },
-    "net35": {
-      "buildOptions": {
-        "debugType": "portable",
-        "define": [
-          "NET35"
-        ]
-      },
-      "frameworkAssemblies": {
-        "System": {
-          "type": "build"
-        },
-        "System.Data": {
-          "type": "build"
-        },
-        "System.Web": {
-          "type": "build"
-        }
-      },
-      "dependencies": {
-        "Newtonsoft.Json": "9.0.1",
-        "NUnit": "3.4.1"
+        "xunit.extensibility.execution": "2.1.0",
+        "dotnet-test-xunit": "1.0.0-rc2-build10025"
       }
     }
-  }
+  },
+
+  "testRunner": "xunit"
 }
