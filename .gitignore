@@ -89,5 +89,8 @@ Backup*/
 UpgradeLog*.XML
 UpgradeLog*.htm
 
-.build
+artifacts
+tools/*
+!/tools/project.json
+.dotnet
 .DS_Store

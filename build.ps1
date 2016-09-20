@@ -1,88 +1,138 @@
 <#
-    Script performs the next steps:
-
-    1. Ensures that NuGet executable is available in "tools" folder.
-       If not available it's downloaded from "dist.nuget.org".
-
-    2. Restores all packages defined in root "packages.config" and project-specific
-       config files into top-level "packages" folder.
-
-    3. [Init]. Initialises build by removing previous artifacts and creates
-       temporary output directories (".\build\" and ".\build\temp\").
-
-    4. [Compile]. Compiles all projects defined in SharpBlueprint.sln with msbuild tool.
-
-    5. [TestNUnit]. Runs NUnit tests with OpenCover profiler (for .NET 3.5 projects).
-        Test coverage statistics are gathered into OpenCover.xml file.
-        NUnit test results are uploaded to AppVeyor (if AppVeyor build environment).
-
-    6. [TestxUnit]. Runs xUnit tests with OpenCover profiler (for .NET 4.5+ projects).
-        Test coverage statistics are gathered into OpenCover.xml file.
-        xUnit test results are uploaded to AppVeyor (if AppVeyor build environment).
-
-    Steps that are not implemented yet:
-        - StyleCop
-        - uploading test coverage results to Coveralls
-        - packaging
-
-    TBD...
+.SYNOPSIS
+This is custom Powershell script to bootstrap a Cake build.
+.DESCRIPTION
+This Powershell script will download NuGet if missing, restore NuGet tools (including Cake)
+and execute your Cake build script with the parameters you provide.
+.PARAMETER Target
+The build script target to run.
+.PARAMETER Configuration
+The build configuration to use.
+.PARAMETER Verbosity
+Specifies the amount of information to be displayed.
+.PARAMETER ScriptArgs
+Remaining arguments are added here.
+.LINK
+http://cakebuild.net
 #>
 
-param (
-    [Int32]$buildNumber=0,
-    [String]$branchName="localBuild",
-    [String]$gitCommitHash="unknownHash"
+[CmdletBinding()]
+Param(
+    [string]$target = "Default",
+    [ValidateSet("Release", "Debug")]
+
+    [string]$configuration = "Release",
+    [ValidateSet("Quiet", "Minimal", "Normal", "Verbose", "Diagnostic")]
+
+    [string]$verbosity = "Verbose",
+    [Parameter(Position=0,Mandatory=$false,ValueFromRemainingArguments=$true)]
+
+    [string[]]$scriptArgs
 )
 
-. build\helpers.ps1
+$solutionRoot = Split-Path $MyInvocation.MyCommand.Path -Parent
 
-# script "build.ps1" is located in solution's root folder
-$solutionRoot = (Resolve-Path .)
+$toolPath = Join-Path $solutionRoot "tools"
+if (!(Test-Path $toolPath)) {
+    Write-Verbose "Creating tools directory..."
+    New-Item -Path $ToolPath -Type directory | Out-Null
+}
 
-# NuGet is the package manager for .NET platform
-$nugetExe = Get-NuGet $solutionRoot
+###########################################################################
+# Install .NET Core SDK
+###########################################################################
 
-@(
-    # packages used in build process and maintenance
-    ".\packages.config",
+$dotnetVersionUri = "https://dotnetcli.blob.core.windows.net/dotnet/Sdk/rel-1.0.0/latest.version"
+$dotnetInstallerUri = "https://raw.githubusercontent.com/dotnet/cli/rel/1.0.0/scripts/obtain/dotnet-install.ps1"
 
-    # project-specific packages
-    # TODO: rewrite so config files are picked up automatically for projects defined in solution
-    # TODO: add support for .NET Core projects
-    ".\src\SharpBlueprint.Client\packages.config",
-    ".\src\SharpBlueprint.Client_Net35\packages.config",
+$dotnetPath = Join-Path $solutionRoot ".dotnet"
+$dotnetExe = Join-Path $dotnetPath "dotnet"
+$dotnetVersionFound = $null
+$dotnetVersionLatest = $null
 
-    ".\test\SharpBlueprint.Client.Tests\packages.config",
-    ".\test\SharpBlueprint.Client.Tests_Net35\packages.config"
+if (Get-Command $dotnetExe -ErrorAction SilentlyContinue)
+{
+    $dotnetVersionFound = & $dotnetExe --version
 
-) | foreach {
-    # packages are restored into single top-level "packages" folder
-    if (Test-Path $_) {
-        &$nugetExe restore (Resolve-Path $_) -PackagesDirectory "$solutionRoot\packages"
+    # check what is the latest version of .NET Core SDK
+    try
+    {
+        $response = (New-Object System.Net.WebClient).DownloadString($dotnetVersionUri);
+        if ($response -ne "")
+        {
+            $dotnetVersionLatest = (-split $response) | select -last 1
+        }
+    }
+    catch [Exception]
+    {
+        Write-Host "Can't check the version of the latest .NET Core SDK: $_"
+    }
+
+    $msgFoundVersion = "Found .NET Core SDK version $dotnetVersionFound"
+
+    if ($dotnetVersionFound -eq $dotnetVersionLatest)
+    {
+        $msgFoundVersion += " (latest)"
+    }
+
+    Write-Host $msgFoundVersion
+}
+
+if (
+    # .NET Core SDK is not present
+    ($dotnetVersionFound -eq $null) -or `
+    # .NET Core SDK presents but is not of the latest version
+    (($dotnetVersionLatest -ne $null) -and ($dotnetVersionFound -ne $dotnetVersionLatest)))
+{
+    Write-Host "Installing the latest .NET Core SDK..."
+
+    if (Test-Path $dotnetPath)
+    {
+        Remove-Item $dotnetPath -Force -Recurse
+    }
+
+    if (!(Test-Path $dotnetPath)) {
+        New-Item $dotnetPath -ItemType Directory | Out-Null
+    }
+
+    (New-Object System.Net.WebClient).DownloadFile($dotnetInstallerUri, "$dotnetPath\dotnet-install.ps1") | Out-Null
+    & $dotnetPath\dotnet-install.ps1 -Version latest -InstallDir $dotnetPath -NoPath | Out-Null
+
+    $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
+    $env:DOTNET_CLI_TELEMETRY_OPTOUT=1
+}
+
+if (Test-Path $dotnetExe)
+{
+    $env:PATH = "$dotnetPath;$env:PATH"
+}
+
+###########################################################################
+# Install Cake
+###########################################################################
+
+$cakeVersion = "0.16.0"
+$cakeExe = Join-Path $toolPath "cake.coreclr/$cakeVersion/Cake.dll"
+$cakeFeed = "https://api.nuget.org/v3/index.json"
+
+if (!(Test-Path $cakeExe)) {
+    Write-Host "Installing Cake..."
+    Invoke-Expression "&`"$dotnetExe`" restore `"$toolPath`" --packages `"$toolPath`" -f `"$cakeFeed`"" | Out-Null;    
+    if ($LastExitCode -ne 0) {
+        Throw "An error occured while installing Cake."
     }
 }
 
-# ensure that Psake is not in the current session for safe importing
-remove-module [p]sake
+###########################################################################
+# Run build script
+###########################################################################
 
-#
-# Psake is a build automation tool that simplifies our life with PowerShell (MS shell).
-#
-Import-Module ((Find-PackagePath ".\packages\" "psake") + "\tools\psake.psm1")
+$arguments = @{
+    target=$target;
+    configuration=$configuration;
+    verbosity=$verbosity;
+}.GetEnumerator() | %{"--{0}=`"{1}`"" -f $_.key, $_.value };
 
-# TODO: consider to get hard-coded params like"Release", "Any CPU" etc. from build environment (ex. AppVeyor) 
-Invoke-psake -buildFile .\build\default.ps1 `
-             -taskList Clean `
-             -properties @{
-                 "buildConfiguration" = "Release"
-                 "buildPlatform" = "Any CPU" } `
-             -parameters @{
-                 "solutionFile" = "..\SharpBlueprint.sln"
-                 "buildNumber" = $buildNumber
-                 "branchName" = $branchName
-                 "gitCommitHash" = $gitCommitHash }
-
-Write-Host "Build exit code:" $LastExitCode
-
-# propagate the exit code so that builds actually fail when there is a problem
+# Start Cake
+Invoke-Expression "&`"$dotnetExe`" `"$cakeExe`" `"build.cake`" $arguments $scriptArgs";
 exit $LastExitCode
