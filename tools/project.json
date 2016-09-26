@@ -4,8 +4,7 @@
     "authors": [ "" ],
 
     "dependencies": {
-        "Cake.CoreCLR": "0.16.0",
-        "Newtonsoft.Json": "9.0.1",
+        "Cake.CoreCLR": "0.16.1",
         "GitReleaseManager": "0.6.0",
         "GitVersion.CommandLine": "3.6.2",
         "OpenCover": "4.6.519",
@@ -13,7 +12,7 @@
     },
 
     "frameworks": {
-        "netstandard1.6": {
+        "netcoreapp1.0": {
         }
     }
 }

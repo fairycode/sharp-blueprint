@@ -1,3 +1,11 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using Cake.Core;
+using Cake.Core.IO;
+using Cake.Common;
+using Cake.Common.IO;
+
 public class BuildPaths
 {
     public BuildFiles Files { get; private set; }

@@ -102,7 +102,7 @@ if (
     $env:DOTNET_CLI_TELEMETRY_OPTOUT=1
 }
 
-if (Test-Path $dotnetExe)
+if (Get-Command $dotnetExe -ErrorAction SilentlyContinue)
 {
     $env:PATH = "$dotnetPath;$env:PATH"
 }
@@ -111,7 +111,7 @@ if (Test-Path $dotnetExe)
 # Install Cake
 ###########################################################################
 
-$cakeVersion = "0.16.0"
+$cakeVersion = "0.16.1"
 $cakeExe = Join-Path $toolPath "cake.coreclr/$cakeVersion/Cake.dll"
 $cakeFeed = "https://api.nuget.org/v3/index.json"
 

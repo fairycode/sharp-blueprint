@@ -1,3 +1,12 @@
+﻿using System;
+using System.Text;
+using System.Reflection;
+using Cake.Core;
+using Cake.Core.IO;
+using Cake.Common;
+using Cake.Common.Diagnostics;
+using Cake.Common.Tools.GitVersion;
+
 public class BuildVersion
 {
     public string Version { get; private set; }
@@ -35,7 +44,7 @@ public class BuildVersion
                 milestone = string.Concat("v", version);
             }
 
-            GitVersion assertedVersions = context.GitVersion(new GitVersionSettings
+            var assertedVersions = context.GitVersion(new GitVersionSettings
             {
                 OutputType = GitVersionOutput.Json,
             });
@@ -49,13 +58,13 @@ public class BuildVersion
 
         if (string.IsNullOrEmpty(version) || string.IsNullOrEmpty(semVersion))
         {
-            context.Information("Fetching verson from first project.json...");
-            version = ReadProjectJsonVersion(context);
+            context.Information("Fetching version from first project.json...");
+            //version = ReadProjectJsonVersion(context);
             semVersion = version;
             milestone = string.Concat("v", version);
         }
 
-        var cakeVersion = typeof(ICakeContext).Assembly.GetName().Version.ToString();
+        var cakeVersion = typeof(ICakeContext).GetTypeInfo().Assembly.GetName().Version.ToString();
 
         return new BuildVersion
         {
@@ -67,12 +76,14 @@ public class BuildVersion
         };
     }
 
+/*
     public static string ReadProjectJsonVersion(ICakeContext context)
     {
-        var projects = context.GetFiles("./**/project.json");
+        var projects = context.GetFiles("./*#1#project.json");
         foreach (var project in projects)
         {
             var content = System.IO.File.ReadAllText(project.FullPath, Encoding.UTF8);
+
             var node = Newtonsoft.Json.Linq.JObject.Parse(content);
             if (node["version"] != null)
             {
@@ -82,17 +93,25 @@ public class BuildVersion
         }
         throw new CakeException("Could not parse version.");
     }
+*/
 
     public bool PatchProjectJson(FilePath project)
     {
         var content = System.IO.File.ReadAllText(project.FullPath, Encoding.UTF8);
-        var node = Newtonsoft.Json.Linq.JObject.Parse(content);
-        if (node["version"] != null)
-        {
-            node["version"].Replace(string.Concat(Version, "-*"));
-            System.IO.File.WriteAllText(project.FullPath, node.ToString(), Encoding.UTF8);
-            return true;
-        };
-        return false;
+
+        var versionStartPos = content.IndexOf("\"version\"", StringComparison.OrdinalIgnoreCase);
+        var versionEndPos = content.IndexOf(",", versionStartPos, StringComparison.OrdinalIgnoreCase);
+
+        if (versionStartPos == -1 || versionEndPos <= versionStartPos) return false;
+
+        var newContent =
+            new StringBuilder(content)
+                .Remove(versionStartPos, versionEndPos - versionStartPos)
+                .Insert(versionStartPos, string.Format(System.Globalization.CultureInfo.InvariantCulture, "\"version\": \"{0}\"", Version))
+                .ToString();
+
+        System.IO.File.WriteAllText(project.FullPath, newContent, Encoding.UTF8);
+
+        return true;
     }
 }

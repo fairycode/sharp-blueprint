@@ -1,6 +1,13 @@
-#load "./paths.cake"
-#load "./packages.cake"
-#load "./version.cake"
+﻿using System;
+using System.Linq;
+using Cake.Core;
+using Cake.Common;
+using Cake.Common.Build;
+
+#load "./paths.cs"
+#load "./packages.cs"
+#load "./version.cs"
+#load "./credentials.cs"
 
 public class BuildParameters
 {
@@ -21,27 +28,17 @@ public class BuildParameters
     public bool SkipGitVersion { get; private set; }
     public bool SkipOpenCover { get; private set; }
 
+    public BuildCredentials GitHub { get; private set; }
+
     public ReleaseNotes ReleaseNotes { get; private set; }
     public BuildVersion Version { get; private set; }
     public BuildPaths Paths { get; private set; }
     public BuildPackages Packages { get; private set; }
 
 
-    public bool ShouldPublish
-    {
-        get
-        {
-            return !IsLocalBuild && !IsPullRequest && IsMainClientBranch && IsTagged;
-        }
-    }
+    public bool ShouldPublish => !IsLocalBuild && !IsPullRequest && IsMainClientBranch && IsTagged;
 
-    public bool ShouldPublishToMyGet
-    {
-        get
-        {
-            return !IsLocalBuild && !IsPullRequest && IsMainClientBranch && !IsTagged;
-        }
-    }
+    public bool ShouldPublishToMyGet => !IsLocalBuild && !IsPullRequest && IsMainClientBranch && !IsTagged;
 
     public void Initialize(ICakeContext context)
     {
@@ -76,11 +73,13 @@ public class BuildParameters
             IsRunningOnAppVeyor = buildSystem.AppVeyor.IsRunningOnAppVeyor,
 
             IsPullRequest = buildSystem.AppVeyor.Environment.PullRequest.IsPullRequest,
-            //IsMainClientRepo = StringComparer.OrdinalIgnoreCase.Equals("fairycode/sharp-blueprint", buildSystem.AppVeyor.Environment.Repository.Name),
             IsMainClientBranch = StringComparer.OrdinalIgnoreCase.Equals("master", buildSystem.AppVeyor.Environment.Repository.Branch),
             IsTagged = IsBuildTagged(buildSystem),
 
+            GitHub = BuildCredentials.GetGitHubCredentials(context),
+
             ReleaseNotes = context.ParseReleaseNotes("./ReleaseNotes.md"),
+
             IsPublishBuild = IsPublishing(target),
             IsReleaseBuild = IsReleasing(target),
             SkipGitVersion = StringComparer.OrdinalIgnoreCase.Equals("True", context.EnvironmentVariable("CLIENT_SKIP_GITVERSION")),

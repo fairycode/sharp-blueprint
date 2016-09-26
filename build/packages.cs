@@ -1,3 +1,8 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using Cake.Core.IO;
+
 public class BuildPackages
 {
     public ICollection<BuildPackage> Nuget { get; private set; }
