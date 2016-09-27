@@ -7,6 +7,12 @@ build_script:
 # tests are run by build scripts
 test: off
 
+# branches to build
+branches:
+  # whitelist
+  only:
+    - master
+
 cache:
 # invalidate cache if build.cake or build packages change
 - tools -> build.cake, build/project_build_tools.json

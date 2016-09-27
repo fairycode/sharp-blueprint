@@ -40,17 +40,15 @@ public class BuildVersion
                 semVersion = context.EnvironmentVariable("GitVersion_LegacySemVerPadded");
                 milestone = string.Concat("v", version);
             }
-            else
-            {
-                var assertedVersions = context.GitVersion(new GitVersionSettings
-                {
-                    OutputType = GitVersionOutput.Json,
-                });
 
-                version = assertedVersions.MajorMinorPatch;
-                semVersion = assertedVersions.LegacySemVerPadded;
-                milestone = string.Concat("v", version);
-            }
+            var assertedVersions = context.GitVersion(new GitVersionSettings
+            {
+                OutputType = GitVersionOutput.Json,
+            });
+
+            version = assertedVersions.MajorMinorPatch;
+            semVersion = assertedVersions.LegacySemVerPadded;
+            milestone = string.Concat("v", version);
 
             context.Information("Calculated Semantic Version: {0}", semVersion);
         }
