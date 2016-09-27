@@ -180,6 +180,7 @@ Task("Copy-Files")
     });
 
     // .NET Standard 1.6
+/*
     DotNetCorePublish("./src/SharpBlueprint.Client/", new DotNetCorePublishSettings
     {
         Framework = "netstandard1.6",
@@ -189,11 +190,12 @@ Task("Copy-Files")
         NoBuild = true,
         Verbose = false
     });
+*/
 
     // copy license
     CopyFileToDirectory("./LICENSE", parameters.Paths.Directories.ArtifactsBinNet35);
     CopyFileToDirectory("./LICENSE", parameters.Paths.Directories.ArtifactsBinNet452);
-    CopyFileToDirectory("./LICENSE", parameters.Paths.Directories.ArtifactsBinNetStandard16);
+    //CopyFileToDirectory("./LICENSE", parameters.Paths.Directories.ArtifactsBinNetStandard16);
 });
 
 Task("Zip-Files")

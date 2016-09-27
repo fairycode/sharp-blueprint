@@ -2,8 +2,8 @@
 .SYNOPSIS
 This is custom Powershell script to bootstrap a Cake build.
 .DESCRIPTION
-This Powershell script will download NuGet if missing, restore NuGet tools (including Cake)
-and execute your Cake build script with the parameters you provide.
+This Powershell script will download .NET Core SDK if missing, restore packages
+for build tools (including Cake) and execute Cake build script.
 .PARAMETER Target
 The build script target to run.
 .PARAMETER Configuration
@@ -19,72 +19,44 @@ http://cakebuild.net
 [CmdletBinding()]
 Param(
     [string]$target = "Default",
+
     [ValidateSet("Release", "Debug")]
-
     [string]$configuration = "Release",
+
     [ValidateSet("Quiet", "Minimal", "Normal", "Verbose", "Diagnostic")]
-
     [string]$verbosity = "Verbose",
-    [Parameter(Position=0,Mandatory=$false,ValueFromRemainingArguments=$true)]
 
+    [Parameter(Position=0,Mandatory=$false,ValueFromRemainingArguments=$true)]
     [string[]]$scriptArgs
 )
 
 $solutionRoot = Split-Path $MyInvocation.MyCommand.Path -Parent
 
-$toolPath = Join-Path $solutionRoot "tools"
-if (!(Test-Path $toolPath)) {
-    Write-Verbose "Creating tools directory..."
-    New-Item -Path $ToolPath -Type directory | Out-Null
-}
-
 ###########################################################################
-# Install .NET Core SDK
+# Prepare .NET Core SDK
 ###########################################################################
 
-$dotnetVersionUri = "https://dotnetcli.blob.core.windows.net/dotnet/Sdk/rel-1.0.0/latest.version"
-$dotnetInstallerUri = "https://raw.githubusercontent.com/dotnet/cli/rel/1.0.0/scripts/obtain/dotnet-install.ps1"
+$dotnetVersion = "1.0.0-preview2-003121"
+$dotnetInstallerUri = "https://raw.githubusercontent.com/dotnet/cli/rel/1.0.0-preview2/scripts/obtain/dotnet-install.ps1"
 
 $dotnetPath = Join-Path $solutionRoot ".dotnet"
-$dotnetExe = Join-Path $dotnetPath "dotnet"
+$dotnetExe = Join-Path $dotnetPath "dotnet.exe"
 $dotnetVersionFound = $null
-$dotnetVersionLatest = $null
 
 if (Get-Command $dotnetExe -ErrorAction SilentlyContinue)
 {
     $dotnetVersionFound = & $dotnetExe --version
 
-    # check what is the latest version of .NET Core SDK
-    try
-    {
-        $response = (New-Object System.Net.WebClient).DownloadString($dotnetVersionUri);
-        if ($response -ne "")
-        {
-            $dotnetVersionLatest = (-split $response) | select -last 1
-        }
-    }
-    catch [Exception]
-    {
-        Write-Host "Can't check the version of the latest .NET Core SDK: $_"
-    }
-
-    $msgFoundVersion = "Found .NET Core SDK version $dotnetVersionFound"
-
-    if ($dotnetVersionFound -eq $dotnetVersionLatest)
-    {
-        $msgFoundVersion += " (latest)"
-    }
-
-    Write-Host $msgFoundVersion
+    Write-Host "Found .NET Core SDK version $dotnetVersionFound"
 }
 
 if (
     # .NET Core SDK is not present
     ($dotnetVersionFound -eq $null) -or `
-    # .NET Core SDK presents but is not of the latest version
-    (($dotnetVersionLatest -ne $null) -and ($dotnetVersionFound -ne $dotnetVersionLatest)))
+    # .NET Core SDK presents but is not of the version we want to go with
+    (($dotnetVersion -ne $null) -and ($dotnetVersion -ne $dotnetVersionFound)))
 {
-    Write-Host "Installing the latest .NET Core SDK..."
+    Write-Host "Installing .NET Core SDK version $dotnetVersion..."
 
     if (Test-Path $dotnetPath)
     {
@@ -96,32 +68,56 @@ if (
     }
 
     (New-Object System.Net.WebClient).DownloadFile($dotnetInstallerUri, "$dotnetPath\dotnet-install.ps1") | Out-Null
-    & $dotnetPath\dotnet-install.ps1 -Version latest -InstallDir $dotnetPath -NoPath | Out-Null
+    & $dotnetPath\dotnet-install.ps1 -Version $dotnetVersion -InstallDir $dotnetPath -NoPath | Out-Null
 
     $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
     $env:DOTNET_CLI_TELEMETRY_OPTOUT=1
 }
 
-if (Get-Command $dotnetExe -ErrorAction SilentlyContinue)
+# ensure that local version of .NET Core SDK (from .dotnet folder) is in use
+if (Get-Command $dotnetExe -ErrorAction Stop)
 {
-    $env:PATH = "$dotnetPath;$env:PATH"
-}
+    $dotnetCommandSource = (Get-Command dotnet –ErrorAction SilentlyContinue).Source
 
-###########################################################################
-# Install Cake
-###########################################################################
-
-$cakeVersion = "0.16.1"
-$cakeExe = Join-Path $toolPath "cake.coreclr/$cakeVersion/Cake.dll"
-$cakeFeed = "https://api.nuget.org/v3/index.json"
-
-if (!(Test-Path $cakeExe)) {
-    Write-Host "Installing Cake..."
-    Invoke-Expression "&`"$dotnetExe`" restore `"$toolPath`" --packages `"$toolPath`" -f `"$cakeFeed`"" | Out-Null;    
-    if ($LastExitCode -ne 0) {
-        Throw "An error occured while installing Cake."
+    if ($dotnetExe -ne $dotnetCommandSource)
+    {
+        $env:PATH = "$dotnetPath;$env:PATH"
     }
 }
+
+###########################################################################
+# Prepare Cake and build tools
+###########################################################################
+
+$buildPath = Join-Path $solutionRoot "build"
+$toolsPath = Join-Path $solutionRoot "tools"
+
+$toolsProjectJson = Join-Path $toolsPath "project.json"
+$toolsProjectJsonSource = Join-Path $buildPath "project_build_tools.json"
+
+$cakeFeed = "https://api.nuget.org/v3/index.json"
+
+# make sure tools folder exists
+if (!(Test-Path $toolsPath)) {
+    Write-Verbose -Message "Creating tools directory..."
+    New-Item -Path $toolsPath -Type directory | Out-Null
+}
+
+# project.json defines packages used in build process
+if (Test-Path $toolsPath) {
+    Write-Verbose -Message "Copying project.json from $toolsProjectJsonSource"
+    Copy-Item $toolsProjectJsonSource $toolsProjectJson –ErrorAction Stop
+}
+
+Write-Host "Preparing Cake and build tools..."
+Invoke-Expression "&dotnet restore `"$toolsPath`" --packages `"$toolsPath`" -f `"$cakeFeed`"" | Out-Null;
+if ($LastExitCode -ne 0) {
+    throw "Error occured while preparing Cake."
+}
+
+$cakeExe = (Get-ChildItem (Join-Path $toolsPath "Cake.CoreCLR/*/Cake.dll") –ErrorAction Stop).FullName |
+            Sort-Object $_ |
+            Select-Object -Last 1
 
 ###########################################################################
 # Run build script
@@ -134,5 +130,5 @@ $arguments = @{
 }.GetEnumerator() | %{"--{0}=`"{1}`"" -f $_.key, $_.value };
 
 # Start Cake
-Invoke-Expression "&`"$dotnetExe`" `"$cakeExe`" `"build.cake`" $arguments $scriptArgs";
+Invoke-Expression "&dotnet `"$cakeExe`" `"build.cake`" $arguments $scriptArgs";
 exit $LastExitCode
