@@ -86,7 +86,7 @@ if (Get-Command $dotnetExe -ErrorAction Stop)
 }
 
 ###########################################################################
-# Prepare Cake and build tools
+# Prepare Cake and helper tools
 ###########################################################################
 
 $buildPath = Join-Path $solutionRoot "build"
@@ -118,6 +118,15 @@ if ($LastExitCode -ne 0)
 $cakeExe = (Get-ChildItem (Join-Path $toolsPath "Cake.CoreCLR/*/Cake.dll") –ErrorAction Stop).FullName |
             Sort-Object $_ |
             Select-Object -Last 1
+
+# NuGet client is used only for uploading packages to MyGet and NuGet repos
+$NugetUrl = "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe"
+$NugetPath = Join-Path $toolsPath "nuget.exe"
+
+if (!(Test-Path $NugetPath)) {
+    Write-Host "Downloading NuGet.exe..."
+    (New-Object System.Net.WebClient).DownloadFile($NugetUrl, $NugetPath);
+}
 
 ###########################################################################
 # Run build script

@@ -222,6 +222,7 @@ Task("Publish-MyGet")
 })
 .OnError(exception =>
 {
+    Information("Error: " + exception.Message);
     Information("Publish-MyGet Task failed, but continuing with next Task...");
     publishingError = true;
 });
@@ -254,6 +255,7 @@ Task("Publish-NuGet")
 })
 .OnError(exception =>
 {
+    Information("Error: " + exception.Message);
     Information("Publish-NuGet Task failed, but continuing with next Task...");
     publishingError = true;
 });
@@ -266,6 +268,7 @@ Task("Publish-GitHub-Release")
 })
 .OnError(exception =>
 {
+    Information("Error: " + exception.Message);
     Information("Publish-GitHub-Release Task failed, but continuing with next Task...");
     publishingError = true;
 });
