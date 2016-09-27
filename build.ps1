@@ -98,20 +98,20 @@ $toolsProjectJsonSource = Join-Path $buildPath "project_build_tools.json"
 $cakeFeed = "https://api.nuget.org/v3/index.json"
 
 # make sure tools folder exists
-if (!(Test-Path $toolsPath)) {
+if (!(Test-Path $toolsPath))
+{
     Write-Verbose -Message "Creating tools directory..."
     New-Item -Path $toolsPath -Type directory | Out-Null
 }
 
 # project.json defines packages used in build process
-if (Test-Path $toolsPath) {
-    Write-Verbose -Message "Copying project.json from $toolsProjectJsonSource"
-    Copy-Item $toolsProjectJsonSource $toolsProjectJson –ErrorAction Stop
-}
+Write-Verbose -Message "Copying project.json from $toolsProjectJsonSource"
+Copy-Item $toolsProjectJsonSource $toolsProjectJson –ErrorAction Stop
 
 Write-Host "Preparing Cake and build tools..."
 Invoke-Expression "&dotnet restore `"$toolsPath`" --packages `"$toolsPath`" -f `"$cakeFeed`"" | Out-Null;
-if ($LastExitCode -ne 0) {
+if ($LastExitCode -ne 0)
+{
     throw "Error occured while preparing Cake."
 }
 
