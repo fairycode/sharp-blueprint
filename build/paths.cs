@@ -32,9 +32,11 @@ public class BuildPaths
         var buildDir = context.Directory("./src/SharpBlueprint.Client/bin") + context.Directory(configuration);
         var artifactsDir = (DirectoryPath)(context.Directory("./artifacts") + context.Directory("v" + semVersion));
         var artifactsBinDir = artifactsDir.Combine("bin");
+
         var artifactsBinNet35 = artifactsBinDir.Combine("net35");
         var artifactsBinNet452 = artifactsBinDir.Combine("net452");
         var artifactsBinNetStandard16 = artifactsBinDir.Combine("netstandard1.6");
+
         var testResultsDir = artifactsDir.Combine("test-results");
         var nugetRoot = artifactsDir.Combine("nuget");
         var testingDir = context.Directory("./test/SharpBlueprint.Client.Tests/bin") + context.Directory(configuration);
@@ -63,10 +65,6 @@ public class BuildPaths
 
         var artifactSourcePaths = clientAssemblyPaths.Concat(testingAssemblyPaths.Concat(repoFilesPaths)).ToArray();
 
-        var zipArtifactPathNet35 = artifactsDir.CombineWithFilePath("Cake-net35-v" + semVersion + ".zip");
-        var zipArtifactPathNet452 = artifactsDir.CombineWithFilePath("Cake-net452-v" + semVersion + ".zip");
-        var zipArtifactPathNetStandard16 = artifactsDir.CombineWithFilePath("Cake-netstandard16-v" + semVersion + ".zip");
-
         var testCoverageOutputFilePath = testResultsDir.CombineWithFilePath("OpenCover.xml");
 
         // Directories
@@ -86,9 +84,6 @@ public class BuildPaths
             testingAssemblyPaths,
             repoFilesPaths,
             artifactSourcePaths,
-            zipArtifactPathNet35,
-            zipArtifactPathNet452,
-            zipArtifactPathNetStandard16,
             testCoverageOutputFilePath);
 
         return new BuildPaths
@@ -105,9 +100,6 @@ public class BuildFiles
     public ICollection<FilePath> TestingAssemblyPaths { get; private set; }
     public ICollection<FilePath> RepoFilesPaths { get; private set; }
     public ICollection<FilePath> ArtifactsSourcePaths { get; private set; }
-    public FilePath ZipArtifactPathNet35 { get; private set; }
-    public FilePath ZipArtifactPathNet452 { get; private set; }
-    public FilePath ZipArtifactPathNetStandard16 { get; private set; }
     public FilePath TestCoverageOutputFilePath { get; private set; }
 
     public BuildFiles(
@@ -116,28 +108,21 @@ public class BuildFiles
         FilePath[] testingAssemblyPaths,
         FilePath[] repoFilesPaths,
         FilePath[] artifactsSourcePaths,
-        FilePath zipArtifactPathNet35,
-        FilePath zipArtifactPathNet452,
-        FilePath zipArtifactPathNetStandard16,
         FilePath testCoverageOutputFilePath)
     {
         ClientAssemblyPaths = Filter(context, clientAssemblyPaths);
         TestingAssemblyPaths = Filter(context, testingAssemblyPaths);
         RepoFilesPaths = Filter(context, repoFilesPaths);
         ArtifactsSourcePaths = Filter(context, artifactsSourcePaths);
-        ZipArtifactPathNet35 = zipArtifactPathNet35;
-        ZipArtifactPathNet452 = zipArtifactPathNet452;
-        ZipArtifactPathNetStandard16 = zipArtifactPathNetStandard16;
         TestCoverageOutputFilePath = testCoverageOutputFilePath;
     }
 
     private static FilePath[] Filter(ICakeContext context, FilePath[] files)
     {
-        // Not a perfect solution, but we need to filter PDB files
-        // when building on an OS that's not Windows (since they don't exist there).
+        // filter out pdb files when building on OS that is not Windows (since they don't exist there)
         if (!context.IsRunningOnWindows())
         {
-            return files.Where(f => !f.FullPath.EndsWith("pdb")).ToArray();
+            return files.Where(f => !f.FullPath.EndsWith("pdb", StringComparison.OrdinalIgnoreCase)).ToArray();
         }
         return files;
     }

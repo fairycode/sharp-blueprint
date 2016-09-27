@@ -90,7 +90,6 @@ UpgradeLog*.XML
 UpgradeLog*.htm
 
 artifacts
-tools/*
-!/tools/project.json
+tools
 .dotnet
 .DS_Store

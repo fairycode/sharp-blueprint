@@ -8,11 +8,10 @@ Setup(context =>
 {
     parameters.Initialize(context);
 
-    Information("Building version {0} of SharpBlueprint.Client ({1}, {2}) using version {3} of Cake. (IsTagged: {4})",
+    Information("Building version {0} of SharpBlueprint.Client ({1}, {2}, IsTagged: {3})",
     parameters.Version.SemVersion,
     parameters.Configuration,
     parameters.Target,
-    parameters.Version.CakeVersion,
     parameters.IsTagged);
 });
 
@@ -153,70 +152,8 @@ Task("Run-Unit-Tests")
     }
 });
 
-Task("Copy-Files")
-    .IsDependentOn("Run-Unit-Tests")
-    .Does(() =>
-{
-    // .NET 3.5
-    DotNetCorePublish("./src/SharpBlueprint.Client/", new DotNetCorePublishSettings
-    {
-        Framework = "net35",
-        VersionSuffix = parameters.Version.DotNetAsterix,
-        Configuration = parameters.Configuration,
-        OutputDirectory = parameters.Paths.Directories.ArtifactsBinNet452,
-        NoBuild = true,
-        Verbose = false
-    });
-
-    // .NET 4.5.2
-    DotNetCorePublish("./src/SharpBlueprint.Client/", new DotNetCorePublishSettings
-    {
-        Framework = "net452",
-        VersionSuffix = parameters.Version.DotNetAsterix,
-        Configuration = parameters.Configuration,
-        OutputDirectory = parameters.Paths.Directories.ArtifactsBinNet35,
-        NoBuild = true,
-        Verbose = false
-    });
-
-    // .NET Standard 1.6
-/*
-    DotNetCorePublish("./src/SharpBlueprint.Client/", new DotNetCorePublishSettings
-    {
-        Framework = "netstandard1.6",
-        Configuration = parameters.Configuration,
-        VersionSuffix = "alpha",
-        OutputDirectory = parameters.Paths.Directories.ArtifactsBinNetStandard16,
-        NoBuild = true,
-        Verbose = false
-    });
-*/
-
-    // copy license
-    CopyFileToDirectory("./LICENSE", parameters.Paths.Directories.ArtifactsBinNet35);
-    CopyFileToDirectory("./LICENSE", parameters.Paths.Directories.ArtifactsBinNet452);
-    //CopyFileToDirectory("./LICENSE", parameters.Paths.Directories.ArtifactsBinNetStandard16);
-});
-
-Task("Zip-Files")
-    .IsDependentOn("Copy-Files")
-    .Does(() =>
-{
-    // .NET 3.5
-    var net35Files = GetFiles(parameters.Paths.Directories.ArtifactsBinNet35.FullPath + "/**/*");
-    Zip(parameters.Paths.Directories.ArtifactsBinNet35, parameters.Paths.Files.ZipArtifactPathNet35, net35Files);
-
-    // .NET 4.5.2
-    var net452Files = GetFiles(parameters.Paths.Directories.ArtifactsBinNet452.FullPath + "/**/*");
-    Zip(parameters.Paths.Directories.ArtifactsBinNet452, parameters.Paths.Files.ZipArtifactPathNet452, net452Files);
-
-    // .NET Standard 1.6
-    var netstandard16Files = GetFiles( parameters.Paths.Directories.ArtifactsBinNetStandard16.FullPath + "/**/*");
-    Zip(parameters.Paths.Directories.ArtifactsBinNetStandard16, parameters.Paths.Files.ZipArtifactPathNetStandard16, netstandard16Files);
-});
-
 Task("Create-NuGet-Packages")
-    .IsDependentOn("Copy-Files")
+    .IsDependentOn("Run-Unit-Tests")
     .Does(() =>
 {
     // Build libraries
@@ -234,21 +171,15 @@ Task("Create-NuGet-Packages")
 });
 
 Task("Upload-AppVeyor-Artifacts")
-    .IsDependentOn("Zip-Files")
     .IsDependentOn("Create-NuGet-Packages")
     .WithCriteria(() => parameters.IsRunningOnAppVeyor)
     .Does(() =>
 {
-    AppVeyor.UploadArtifact(parameters.Paths.Files.ZipArtifactPathNet35);
-    AppVeyor.UploadArtifact(parameters.Paths.Files.ZipArtifactPathNet452);
-    AppVeyor.UploadArtifact(parameters.Paths.Files.ZipArtifactPathNetStandard16);
-
     foreach(var package in GetFiles(parameters.Paths.Directories.NugetRoot + "/*"))
     {
         AppVeyor.UploadArtifact(package);
     }
 });
-
 /*
 Task("Upload-Coverage-Report")
     .WithCriteria(() => FileExists(parameters.Paths.Files.TestCoverageOutputFilePath))
@@ -263,7 +194,6 @@ Task("Upload-Coverage-Report")
     });
 });
 */
-
 Task("Publish-MyGet")
     .IsDependentOn("Package")
     .WithCriteria(() => parameters.ShouldPublishToMyGet)
@@ -332,10 +262,6 @@ Task("Publish-GitHub-Release")
     .WithCriteria(() => parameters.ShouldPublish)
     .Does(() =>
 {
-    GitReleaseManagerAddAssets(parameters.GitHub.UserName, parameters.GitHub.Password, "fairycode", "sharp-blueprint", parameters.Version.Milestone, parameters.Paths.Files.ZipArtifactPathNet35.ToString());
-    GitReleaseManagerAddAssets(parameters.GitHub.UserName, parameters.GitHub.Password, "fairycode", "sharp-blueprint", parameters.Version.Milestone, parameters.Paths.Files.ZipArtifactPathNet452.ToString());
-    GitReleaseManagerAddAssets(parameters.GitHub.UserName, parameters.GitHub.Password, "fairycode", "sharp-blueprint", parameters.Version.Milestone, parameters.Paths.Files.ZipArtifactPathNetStandard16.ToString());
-
     GitReleaseManagerClose(parameters.GitHub.UserName, parameters.GitHub.Password, "fairycode", "sharp-blueprint", parameters.Version.Milestone);
 })
 .OnError(exception =>
@@ -360,7 +286,6 @@ Task("Create-Release-Notes")
 //
 
 Task("Package")
-    .IsDependentOn("Zip-Files")
     .IsDependentOn("Create-NuGet-Packages");
 
 Task("Default")

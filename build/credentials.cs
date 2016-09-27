@@ -15,7 +15,7 @@ public class BuildCredentials
     public static BuildCredentials GetGitHubCredentials(ICakeContext context)
     {
         return new BuildCredentials(
-            context.EnvironmentVariable("CLIENT_GITHUB_USERNAME"),
-            context.EnvironmentVariable("CLIENT_GITHUB_PASSWORD"));
+            context.EnvironmentVariable("GITHUB_USERNAME"),
+            context.EnvironmentVariable("GITHUB_PASSWORD"));
     }
 }
