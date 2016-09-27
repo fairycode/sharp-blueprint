@@ -1,11 +1,19 @@
-version: '{build}'  
-pull_requests:  
-  do_not_increment_build_number: true
+init:
+  - git config --global core.autocrlf true
+
+build_script:
+  - ps: .\build.ps1 -Target "AppVeyor"
+
+# tests are run by build scripts
+test: off
+
+# branches to build
 branches:
+  # whitelist
   only:
-  - master
-nuget:  
-  disable_publish_on_pr: true
-build_script:  
-- ps: .\build.ps1
-test: off  
+    - master
+
+cache:
+# invalidate cache if build.cake or build packages change
+- tools -> build.cake, build/project_build_tools.json
+- .dotnet -> build.cake
