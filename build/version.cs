@@ -53,6 +53,14 @@ public class BuildVersion
             context.Information("Calculated Semantic Version: {0}", semVersion);
         }
 
+        if (string.IsNullOrEmpty(version) || string.IsNullOrEmpty(semVersion))
+        {
+            context.Information("Fetching version from first project.json...");
+            version = "0.1.0";//ReadProjectJsonVersion(context);
+            semVersion = version;
+            milestone = string.Concat("v", version);
+        }
+
         return new BuildVersion
         {
             Version = version,
