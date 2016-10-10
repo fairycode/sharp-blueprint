@@ -34,7 +34,7 @@ public class BuildPaths
         var artifactsBinDir = artifactsDir.Combine("bin");
 
         var artifactsBinNet35 = artifactsBinDir.Combine("net35");
-        var artifactsBinNet452 = artifactsBinDir.Combine("net452");
+        var artifactsBinNet45 = artifactsBinDir.Combine("net45");
         var artifactsBinNetStandard16 = artifactsBinDir.Combine("netstandard1.6");
 
         var testResultsDir = artifactsDir.Combine("test-results");
@@ -74,7 +74,7 @@ public class BuildPaths
             nugetRoot,
             artifactsBinDir,
             artifactsBinNet35,
-            artifactsBinNet452,
+            artifactsBinNet45,
             artifactsBinNetStandard16);
 
         // Files
@@ -135,7 +135,7 @@ public class BuildDirectories
     public DirectoryPath NugetRoot { get; private set; }
     public DirectoryPath ArtifactsBin { get; private set; }
     public DirectoryPath ArtifactsBinNet35 { get; private set; }
-    public DirectoryPath ArtifactsBinNet452 { get; private set; }
+    public DirectoryPath ArtifactsBinNet45 { get; private set; }
     public DirectoryPath ArtifactsBinNetStandard16 { get; private set; }
     public ICollection<DirectoryPath> ToClean { get; private set; }
 
@@ -145,7 +145,7 @@ public class BuildDirectories
         DirectoryPath nugetRoot,
         DirectoryPath artifactsBinDir,
         DirectoryPath artifactsBinNet35,
-        DirectoryPath artifactsBinNet452,
+        DirectoryPath artifactsBinNet45,
         DirectoryPath artifactsBinNetStandard16)
     {
         Artifacts = artifactsDir;
@@ -153,7 +153,7 @@ public class BuildDirectories
         NugetRoot = nugetRoot;
         ArtifactsBin = artifactsBinDir;
         ArtifactsBinNet35 = artifactsBinNet35;
-        ArtifactsBinNet452 = artifactsBinNet452;
+        ArtifactsBinNet45 = artifactsBinNet45;
         ArtifactsBinNetStandard16 = artifactsBinNetStandard16;
         ToClean = new[] {
             Artifacts,
@@ -161,7 +161,7 @@ public class BuildDirectories
             NugetRoot,
             ArtifactsBin,
             ArtifactsBinNet35,
-            ArtifactsBinNet452,
+            ArtifactsBinNet45,
             ArtifactsBinNetStandard16
         };
     }

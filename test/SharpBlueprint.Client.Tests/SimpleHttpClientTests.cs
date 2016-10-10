@@ -1,19 +1,12 @@
 ﻿using System;
-#if NET35
-using NUnit.Framework;
-#else
 using Xunit;
-#endif
 
 namespace SharpBlueprint.Client.Tests
 {
-#if NET35
-    [TestFixture]
-#endif
     public class SimpleHttpClientTests
     {
 #if NET35
-        [Test]
+        [Fact]
         public void GetDotNetCountTest()
         {
             var client = new SimpleHttpClient();
@@ -21,9 +14,9 @@ namespace SharpBlueprint.Client.Tests
 
             Console.WriteLine(result);
 
-            Assert.IsTrue(!string.IsNullOrEmpty(result));
+            Assert.True(!string.IsNullOrEmpty(result));
         }
-#else
+#endif
         [Fact]
         public void GetDotNetCountAsyncTest()
         {
@@ -36,6 +29,5 @@ namespace SharpBlueprint.Client.Tests
 
             Assert.True(!string.IsNullOrEmpty(result));
         }
-#endif
     }
 }
