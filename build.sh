@@ -1,105 +1,123 @@
 #!/usr/bin/env bash
 
 ##########################################################################
-# This is the Cake bootstrapper script for Linux and OS X.
-# This file was downloaded from https://github.com/cake-build/resources
-# Feel free to change this file to fit your needs.
+# Custom Cake bootstrapper script for Linux and OS X.
+#
+# Script will download .NET Core SDK if missing, restore packages
+# for build tools (including Cake) and execute Cake build script.
+#
 ##########################################################################
 
-# define directories
-SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-TOOLS_DIR=$SCRIPT_DIR/tools
-
-DOTNET_DIR=$SCRIPT_DIR/.dotnet
-DOTNET_EXE=$DOTNET_DIR/dotnet
-
-CAKE_VERSION=0.16.0-alpha0082
-CAKE_FEED=https://www.myget.org/F/cake/api/v3/index.json
-CAKE_EXE=$TOOLS_DIR/Cake.CoreCLR/$CAKE_VERSION/Cake.dll
-
 # define default arguments
-SCRIPT="build.cake"
 TARGET="Default"
 CONFIGURATION="Release"
 VERBOSITY="verbose"
-DRYRUN=
-SHOW_VERSION=false
 SCRIPT_ARGUMENTS=()
 
 # parse arguments
 for i in "$@"; do
     case $1 in
-        -s|--script) SCRIPT="$2"; shift ;;
         -t|--target) TARGET="$2"; shift ;;
         -c|--configuration) CONFIGURATION="$2"; shift ;;
         -v|--verbosity) VERBOSITY="$2"; shift ;;
-        -d|--dryrun) DRYRUN="-dryrun" ;;
-        --version) SHOW_VERSION=true ;;
         --) shift; SCRIPT_ARGUMENTS+=("$@"); break ;;
         *) SCRIPT_ARGUMENTS+=("$1") ;;
     esac
     shift
 done
 
-# TODO: explain why TOOLS_DIR is required
-if [ ! -d "$TOOLS_DIR" ]; then
-    echo "Could not find '$TOOLS_DIR' folder."
-    exit 1
+SOLUTION_ROOT=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+
+###########################################################################
+# Prepare .NET Core SDK
+###########################################################################
+
+DOTNET_VERSION="1.0.0-preview2-003121"
+DOTNET_INSTALLER_URI="https://raw.githubusercontent.com/dotnet/cli/rel/1.0.0-preview2/scripts/obtain/dotnet-install.sh"
+
+DOTNET_PATH=$SOLUTION_ROOT/.dotnet
+DOTNET_EXE=$DOTNET_PATH/dotnet
+DOTNET_VERSION_FOUND=""
+
+if [ -f "$DOTNET_EXE" ]; then
+
+    DOTNET_VERSION_FOUND=$("$DOTNET_EXE" --version)
+
+    echo "Found .NET Core SDK version $DOTNET_VERSION_FOUND"
 fi
 
-###########################################################################
-# Install .NET Core CLI
-###########################################################################
+if [[
+    # .NET Core SDK is not present
+    -z "$DOTNET_VERSION_FOUND" ||
+    # .NET Core SDK presents but is not of the version we want to go with
+    $DOTNET_VERSION != $DOTNET_VERSION_FOUND
+]]; then
 
-if [ ! -f "$DOTNET_EXE" ]; then
-    echo "Installing .NET CLI..."
+    echo "Installing .NET Core SDK version $DOTNET_VERSION"
 
-    if [ ! -d "$DOTNET_DIR" ]; then
-        mkdir "$DOTNET_DIR"
+    if [ -d "$DOTNET_PATH" ]; then
+        rm -rf "$DOTNET_PATH"
     fi
 
-    # https://github.com/dotnet/cli/blob/rel/1.0.0/Documentation/cli-installation-scenarios.md
-    curl -Lsfo "$DOTNET_DIR/dotnet-install.sh" https://raw.githubusercontent.com/dotnet/cli/rel/1.0.0/scripts/obtain/dotnet-install.sh
-    bash "$DOTNET_DIR/dotnet-install.sh" --version latest --install-dir $DOTNET_DIR --no-path
+    if [ ! -d "$DOTNET_PATH" ]; then
+        mkdir "$DOTNET_PATH"
+    fi
 
-    "$DOTNET_DIR/dotnet" --info
+    # download installer script
+    curl -Lsfo "$DOTNET_PATH/dotnet-install.sh" "$DOTNET_INSTALLER_URI"
+
+    # .NET Core SDK is installed into local "DOTNET_PATH" folder
+    bash "$DOTNET_PATH/dotnet-install.sh" --version "$DOTNET_VERSION" --install-dir "$DOTNET_PATH" --no-path
 fi
 
-# Make sure that dotnet CLI has been installed.
+# make sure that .NET Core SDK has been installed
 if [ ! -f "$DOTNET_EXE" ]; then
-    echo "Could not find dotnet CLI at '$DOTNET_EXE'."
+    echo "Could not find .NET Core SDK at '$DOTNET_EXE'"
     exit 1
 fi
 
-export PATH="$DOTNET_DIR":$PATH
+export PATH="$DOTNET_PATH":$PATH
 export DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
 export DOTNET_CLI_TELEMETRY_OPTOUT=1
 
 ###########################################################################
-# Install Cake
+# Prepare Cake and helper tools
 ###########################################################################
 
-if [ ! -f "$CAKE_EXE" ]; then
-    exec $DOTNET_EXE restore "$TOOLS_DIR" --packages "$TOOLS_DIR" -f "$CAKE_FEED"
-    if [ $? -ne 0 ]; then
-        echo "An error occured while installing Cake."
-        exit 1
-    fi
+BUILD_PATH=$SOLUTION_ROOT/build
+TOOLS_PATH=$SOLUTION_ROOT/tools
+
+TOOLS_PROJECT_JSON=$TOOLS_PATH/project.json
+TOOLS_PROJECT_JSON_SRC=$BUILD_PATH/project_build_tools.json
+
+CAKE_FEED="https://api.nuget.org/v3/index.json"
+
+echo "Preparing Cake and build tools"
+
+if [ ! -d "$TOOLS_PATH" ]; then
+    echo "Creating tools directory"
+    mkdir "$TOOLS_PATH"
 fi
 
-# Make sure that Cake has been installed.
+echo "Copying project.json from $TOOLS_PROJECT_JSON_SRC"
+cp "$TOOLS_PROJECT_JSON_SRC" "$TOOLS_PROJECT_JSON"
+
+dotnet restore "$TOOLS_PATH" --packages "$TOOLS_PATH" --verbosity Warning -f "$CAKE_FEED"
+if [ $? -ne 0 ]; then
+    echo "Error occured while installing Cake and build tools"
+    exit 1
+fi
+
+CAKE_EXE=$( ls $TOOLS_PATH/Cake.CoreCLR/*/Cake.dll | sort | tail -n 1 )
+
+# make sure that Cake has been installed
 if [ ! -f "$CAKE_EXE" ]; then
     echo "Could not find Cake.exe at '$CAKE_EXE'."
     exit 1
 fi
 
-
 ###########################################################################
 # Run build script
 ###########################################################################
 
-if $SHOW_VERSION; then
-    exec $DOTNET_EXE "$CAKE_EXE" -version
-else
-    exec $DOTNET_EXE "$CAKE_EXE" $SCRIPT -verbosity=$VERBOSITY -configuration=$CONFIGURATION -target=$TARGET $DRYRUN "${SCRIPT_ARGUMENTS[@]}"
-fi
+exec dotnet "$CAKE_EXE" build.cake -verbosity=$VERBOSITY -configuration=$CONFIGURATION -target=$TARGET "${SCRIPT_ARGUMENTS[@]}"
