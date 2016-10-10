@@ -96,7 +96,7 @@ Task("Run-Unit-Tests")
                     tool.DotNetCoreTest(project.GetDirectory().FullPath, new DotNetCoreTestSettings {
                         Configuration = parameters.Configuration,
                         NoBuild = true,
-                        Verbose = false,
+                        Verbose = true,
                         ArgumentCustomization = args =>
                             args.Append("-xml").Append(parameters.Paths.Directories.TestResults.CombineWithFilePath(project.GetFilenameWithoutExtension()).FullPath + ".xml")
                     });};
@@ -107,7 +107,8 @@ Task("Run-Unit-Tests")
                         parameters.Paths.Files.TestCoverageOutputFilePath,
                         new OpenCoverSettings {
                             ReturnTargetCodeOffset = 0,
-                            ArgumentCustomization = args => args.Append("-mergeoutput")
+                            MergeOutput = true,
+                            Register = "user"
                         }
                         .WithFilter("+[*]* -[nunit.*]* -[xunit.*]* -[*.Tests]*")
                         .ExcludeByAttribute("*.ExcludeFromCodeCoverage*")
