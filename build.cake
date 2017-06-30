@@ -206,12 +206,17 @@ Task("Publish-MyGet")
     if (string.IsNullOrEmpty(apiKey))
         throw new InvalidOperationException("Could not resolve MyGet API key");
 
-    var packages = GetFiles(nugetDir + "/*.nupkg");
+    foreach (var package in GetFiles(nugetDir + "/*.nupkg"))
+    {
+        // symbols packages are pushed alongside regular ones so no need to push them explicitly
+        if (package.FullPath.EndsWith("symbols.nupkg", StringComparison.OrdinalIgnoreCase))
+            continue;
 
-    NuGetPush(packages, new NuGetPushSettings {
-        Source = serverUrl,
-        ApiKey = apiKey
-    });
+        NuGetPush(package.FullPath, new NuGetPushSettings {
+            Source = serverUrl,
+            ApiKey = apiKey
+        });
+    }
 })
 .OnError(exception =>
 {
@@ -231,12 +236,17 @@ Task("Publish-NuGet")
     if (string.IsNullOrEmpty(apiKey))
         throw new InvalidOperationException("Could not resolve NuGet API key");
 
-    var packages = GetFiles(nugetDir + "/*.nupkg");
+    foreach (var package in GetFiles(nugetDir + "/*.nupkg"))
+    {
+        // symbols packages are pushed alongside regular ones so no need to push them explicitly
+        if (package.FullPath.EndsWith("symbols.nupkg", StringComparison.OrdinalIgnoreCase))
+            continue;
 
-    NuGetPush(packages, new NuGetPushSettings {
-        Source = serverUrl,
-        ApiKey = apiKey
-    });
+        NuGetPush(package.FullPath, new NuGetPushSettings {
+            Source = serverUrl,
+            ApiKey = apiKey
+        });
+    }
 })
 .OnError(exception =>
 {
