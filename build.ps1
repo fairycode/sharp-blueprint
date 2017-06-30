@@ -1,143 +1,228 @@
+##########################################################################
+# This is the Cake bootstrapper script for PowerShell.
+# This file was downloaded from https://github.com/cake-build/resources
+# Feel free to change this file to fit your needs.
+##########################################################################
+
 <#
+
 .SYNOPSIS
-This is custom Powershell script to bootstrap a Cake build.
+This is a Powershell script to bootstrap a Cake build.
+
 .DESCRIPTION
-This Powershell script will download .NET Core SDK if missing, restore packages
-for build tools (including Cake) and execute Cake build script.
+This Powershell script will download NuGet if missing, restore NuGet tools (including Cake)
+and execute your Cake build script with the parameters you provide.
+
+.PARAMETER Script
+The build script to execute.
 .PARAMETER Target
 The build script target to run.
 .PARAMETER Configuration
 The build configuration to use.
 .PARAMETER Verbosity
 Specifies the amount of information to be displayed.
+.PARAMETER Experimental
+Tells Cake to use the latest Roslyn release.
+.PARAMETER WhatIf
+Performs a dry run of the build script.
+No tasks will be executed.
+.PARAMETER Mono
+Tells Cake to use the Mono scripting engine.
+.PARAMETER SkipToolPackageRestore
+Skips restoring of packages.
 .PARAMETER ScriptArgs
 Remaining arguments are added here.
+
 .LINK
 http://cakebuild.net
+
 #>
 
 [CmdletBinding()]
 Param(
-    [string]$target = "Default",
-
+    [string]$Script = "build.cake",
+    [string]$Target = "Default",
     [ValidateSet("Release", "Debug")]
-    [string]$configuration = "Release",
-
+    [string]$Configuration = "Release",
     [ValidateSet("Quiet", "Minimal", "Normal", "Verbose", "Diagnostic")]
-    [string]$verbosity = "Verbose",
-
+    [string]$Verbosity = "Verbose",
+    [switch]$Experimental,
+    [Alias("DryRun","Noop")]
+    [switch]$WhatIf,
+    [switch]$Mono,
+    [switch]$SkipToolPackageRestore,
     [Parameter(Position=0,Mandatory=$false,ValueFromRemainingArguments=$true)]
-    [string[]]$scriptArgs
+    [string[]]$ScriptArgs
 )
 
-$solutionRoot = Split-Path $MyInvocation.MyCommand.Path -Parent
-
-###########################################################################
-# Prepare .NET Core SDK
-###########################################################################
-
-$dotnetVersion = "1.0.0-preview2-003121"
-$dotnetInstallerUri = "https://raw.githubusercontent.com/dotnet/cli/rel/1.0.0-preview2/scripts/obtain/dotnet-install.ps1"
-
-$dotnetPath = Join-Path $solutionRoot ".dotnet"
-$dotnetExe = Join-Path $dotnetPath "dotnet.exe"
-$dotnetVersionFound = $null
-
-if (Get-Command $dotnetExe -ErrorAction SilentlyContinue)
+[Reflection.Assembly]::LoadWithPartialName("System.Security") | Out-Null
+function MD5HashFile([string] $filePath)
 {
-    $dotnetVersionFound = & $dotnetExe --version
-
-    Write-Host "Found .NET Core SDK version $dotnetVersionFound"
-}
-
-if (
-    # .NET Core SDK is not present
-    ($dotnetVersionFound -eq $null) -or `
-    # .NET Core SDK presents but is not of the version we want to go with
-    (($dotnetVersion -ne $null) -and ($dotnetVersion -ne $dotnetVersionFound)))
-{
-    Write-Host "Installing .NET Core SDK version $dotnetVersion..."
-
-    if (Test-Path $dotnetPath)
+    if ([string]::IsNullOrEmpty($filePath) -or !(Test-Path $filePath -PathType Leaf))
     {
-        Remove-Item $dotnetPath -Force -Recurse
+        return $null
     }
 
-    if (!(Test-Path $dotnetPath)) {
-        New-Item $dotnetPath -ItemType Directory | Out-Null
-    }
-
-    (New-Object System.Net.WebClient).DownloadFile($dotnetInstallerUri, "$dotnetPath\dotnet-install.ps1") | Out-Null
-    & $dotnetPath\dotnet-install.ps1 -Version $dotnetVersion -InstallDir $dotnetPath -NoPath | Out-Null
-
-    $env:DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
-    $env:DOTNET_CLI_TELEMETRY_OPTOUT=1
-}
-
-# ensure that local version of .NET Core SDK (from .dotnet folder) is in use
-if (Get-Command $dotnetExe -ErrorAction Stop)
-{
-    $dotnetCommandSource = (Get-Command dotnet –ErrorAction SilentlyContinue).Source
-
-    if ($dotnetExe -ne $dotnetCommandSource)
+    [System.IO.Stream] $file = $null;
+    [System.Security.Cryptography.MD5] $md5 = $null;
+    try
     {
-        $env:PATH = "$dotnetPath;$env:PATH"
+        $md5 = [System.Security.Cryptography.MD5]::Create()
+        $file = [System.IO.File]::OpenRead($filePath)
+        return [System.BitConverter]::ToString($md5.ComputeHash($file))
+    }
+    finally
+    {
+        if ($file -ne $null)
+        {
+            $file.Dispose()
+        }
     }
 }
 
-###########################################################################
-# Prepare Cake and helper tools
-###########################################################################
+Write-Host "Preparing to run build script..."
 
-$buildPath = Join-Path $solutionRoot "build"
-$toolsPath = Join-Path $solutionRoot "tools"
+if(!$PSScriptRoot){
+    $PSScriptRoot = Split-Path $MyInvocation.MyCommand.Path -Parent
+}
 
-$toolsProjectJson = Join-Path $toolsPath "project.json"
-$toolsProjectJsonSource = Join-Path $buildPath "project_build_tools.json"
+$TOOLS_DIR = Join-Path $PSScriptRoot "tools"
+$ADDINS_DIR = Join-Path $TOOLS_DIR "addins"
+$MODULES_DIR = Join-Path $TOOLS_DIR "modules"
+$NUGET_EXE = Join-Path $TOOLS_DIR "nuget.exe"
+$CAKE_EXE = Join-Path $TOOLS_DIR "Cake/Cake.exe"
+$NUGET_URL = "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe"
+$PACKAGES_CONFIG = Join-Path $TOOLS_DIR "packages.config"
+$PACKAGES_CONFIG_MD5 = Join-Path $TOOLS_DIR "packages.config.md5sum"
+$ADDINS_PACKAGES_CONFIG = Join-Path $ADDINS_DIR "packages.config"
+$MODULES_PACKAGES_CONFIG = Join-Path $MODULES_DIR "packages.config"
 
-$cakeFeed = "https://api.nuget.org/v3/index.json"
+# Should we use mono?
+$UseMono = "";
+if($Mono.IsPresent) {
+    Write-Verbose -Message "Using the Mono based scripting engine."
+    $UseMono = "-mono"
+}
 
-# make sure tools folder exists
-if (!(Test-Path $toolsPath))
-{
+# Should we use the new Roslyn?
+$UseExperimental = "";
+if($Experimental.IsPresent -and !($Mono.IsPresent)) {
+    Write-Verbose -Message "Using experimental version of Roslyn."
+    $UseExperimental = "-experimental"
+}
+
+# Is this a dry run?
+$UseDryRun = "";
+if($WhatIf.IsPresent) {
+    $UseDryRun = "-dryrun"
+}
+
+# Make sure tools folder exists
+if ((Test-Path $PSScriptRoot) -and !(Test-Path $TOOLS_DIR)) {
     Write-Verbose -Message "Creating tools directory..."
-    New-Item -Path $toolsPath -Type directory | Out-Null
+    New-Item -Path $TOOLS_DIR -Type directory | out-null
 }
 
-# project.json defines packages used in build process
-Write-Verbose -Message "Copying project.json from $toolsProjectJsonSource"
-Copy-Item $toolsProjectJsonSource $toolsProjectJson –ErrorAction Stop
-
-Write-Host "Preparing Cake and build tools..."
-Invoke-Expression "&dotnet restore `"$toolsPath`" --packages `"$toolsPath`" -f `"$cakeFeed`"" | Out-Null;
-if ($LastExitCode -ne 0)
-{
-    throw "Error occured while preparing Cake."
+# Make sure that packages.config exist.
+if (!(Test-Path $PACKAGES_CONFIG)) {
+    Write-Verbose -Message "Downloading packages.config..."
+    try { (New-Object System.Net.WebClient).DownloadFile("http://cakebuild.net/download/bootstrapper/packages", $PACKAGES_CONFIG) } catch {
+        Throw "Could not download packages.config."
+    }
 }
 
-$cakeExe = (Get-ChildItem (Join-Path $toolsPath "Cake.CoreCLR/*/Cake.dll") –ErrorAction Stop).FullName |
-            Sort-Object $_ |
-            Select-Object -Last 1
-
-# NuGet client is used only for uploading packages to MyGet and NuGet repos
-$NugetUrl = "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe"
-$NugetPath = Join-Path $toolsPath "nuget.exe"
-
-if (!(Test-Path $NugetPath)) {
-    Write-Host "Downloading NuGet.exe..."
-    (New-Object System.Net.WebClient).DownloadFile($NugetUrl, $NugetPath);
+# Try find NuGet.exe in path if not exists
+if (!(Test-Path $NUGET_EXE)) {
+    Write-Verbose -Message "Trying to find nuget.exe in PATH..."
+    $existingPaths = $Env:Path -Split ';' | Where-Object { (![string]::IsNullOrEmpty($_)) -and (Test-Path $_ -PathType Container) }
+    $NUGET_EXE_IN_PATH = Get-ChildItem -Path $existingPaths -Filter "nuget.exe" | Select -First 1
+    if ($NUGET_EXE_IN_PATH -ne $null -and (Test-Path $NUGET_EXE_IN_PATH.FullName)) {
+        Write-Verbose -Message "Found in PATH at $($NUGET_EXE_IN_PATH.FullName)."
+        $NUGET_EXE = $NUGET_EXE_IN_PATH.FullName
+    }
 }
 
-###########################################################################
-# Run build script
-###########################################################################
+# Try download NuGet.exe if not exists
+if (!(Test-Path $NUGET_EXE)) {
+    Write-Verbose -Message "Downloading NuGet.exe..."
+    try {
+        (New-Object System.Net.WebClient).DownloadFile($NUGET_URL, $NUGET_EXE)
+    } catch {
+        Throw "Could not download NuGet.exe."
+    }
+}
 
-$arguments = @{
-    target=$target;
-    configuration=$configuration;
-    verbosity=$verbosity;
-}.GetEnumerator() | %{"--{0}=`"{1}`"" -f $_.key, $_.value };
+# Save nuget.exe path to environment to be available to child processed
+$ENV:NUGET_EXE = $NUGET_EXE
+
+# Restore tools from NuGet?
+if(-Not $SkipToolPackageRestore.IsPresent) {
+    Push-Location
+    Set-Location $TOOLS_DIR
+
+    # Check for changes in packages.config and remove installed tools if true.
+    [string] $md5Hash = MD5HashFile($PACKAGES_CONFIG)
+    if((!(Test-Path $PACKAGES_CONFIG_MD5)) -Or
+      ($md5Hash -ne (Get-Content $PACKAGES_CONFIG_MD5 ))) {
+        Write-Verbose -Message "Missing or changed package.config hash..."
+        Remove-Item * -Recurse -Exclude packages.config,nuget.exe
+    }
+
+    Write-Verbose -Message "Restoring tools from NuGet..."
+    $NuGetOutput = Invoke-Expression "&`"$NUGET_EXE`" install -ExcludeVersion -OutputDirectory `"$TOOLS_DIR`""
+
+    if ($LASTEXITCODE -ne 0) {
+        Throw "An error occured while restoring NuGet tools."
+    }
+    else
+    {
+        $md5Hash | Out-File $PACKAGES_CONFIG_MD5 -Encoding "ASCII"
+    }
+    Write-Verbose -Message ($NuGetOutput | out-string)
+    
+    Pop-Location
+}
+
+# Restore addins from NuGet
+if (Test-Path $ADDINS_PACKAGES_CONFIG) {
+    Push-Location
+    Set-Location $ADDINS_DIR
+
+    Write-Verbose -Message "Restoring addins from NuGet..."
+    $NuGetOutput = Invoke-Expression "&`"$NUGET_EXE`" install -ExcludeVersion -OutputDirectory `"$ADDINS_DIR`""
+
+    if ($LASTEXITCODE -ne 0) {
+        Throw "An error occured while restoring NuGet addins."
+    }
+
+    Write-Verbose -Message ($NuGetOutput | out-string)
+
+    Pop-Location
+}
+
+# Restore modules from NuGet
+if (Test-Path $MODULES_PACKAGES_CONFIG) {
+    Push-Location
+    Set-Location $MODULES_DIR
+
+    Write-Verbose -Message "Restoring modules from NuGet..."
+    $NuGetOutput = Invoke-Expression "&`"$NUGET_EXE`" install -ExcludeVersion -OutputDirectory `"$MODULES_DIR`""
+
+    if ($LASTEXITCODE -ne 0) {
+        Throw "An error occured while restoring NuGet modules."
+    }
+
+    Write-Verbose -Message ($NuGetOutput | out-string)
+
+    Pop-Location
+}
+
+# Make sure that Cake has been installed.
+if (!(Test-Path $CAKE_EXE)) {
+    Throw "Could not find Cake.exe at $CAKE_EXE"
+}
 
 # Start Cake
-Invoke-Expression "&dotnet `"$cakeExe`" `"build.cake`" $arguments $scriptArgs";
-exit $LastExitCode
+Write-Host "Running build script..."
+Invoke-Expression "& `"$CAKE_EXE`" `"$Script`" -target=`"$Target`" -configuration=`"$Configuration`" -verbosity=`"$Verbosity`" $UseMono $UseDryRun $UseExperimental $ScriptArgs"
+exit $LASTEXITCODE

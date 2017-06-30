@@ -1,0 +1,13 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Authors>Fairy Coder</Authors>
+    <Copyright>Copyright (c) 2017 Fairy Coder</Copyright>
+    <Description>C# project blueprint with multi-framework support</Description>
+    <PackageId>SharpBlueprint.Client</PackageId>
+    <TargetFrameworks>netstandard1.4;net452</TargetFrameworks>
+    <Title>SharpBlueprint.Client</Title>
+    <Version>2.0.1</Version>
+  </PropertyGroup>
+
+</Project>

@@ -1,123 +1,131 @@
 #!/usr/bin/env bash
 
 ##########################################################################
-# Custom Cake bootstrapper script for Linux and OS X.
-#
-# Script will download .NET Core SDK if missing, restore packages
-# for build tools (including Cake) and execute Cake build script.
-#
+# This is the Cake bootstrapper script for Linux and OS X.
+# This file was downloaded from https://github.com/cake-build/resources
+# Feel free to change this file to fit your needs.
 ##########################################################################
 
-# define default arguments
+# Define directories.
+SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
+TOOLS_DIR=$SCRIPT_DIR/tools
+ADDINS_DIR=$TOOLS_DIR/addins
+MODULES_DIR=$TOOLS_DIR/modules
+NUGET_EXE=$TOOLS_DIR/nuget.exe
+CAKE_EXE=$TOOLS_DIR/Cake/Cake.exe
+PACKAGES_CONFIG=$TOOLS_DIR/packages.config
+PACKAGES_CONFIG_MD5=$TOOLS_DIR/packages.config.md5sum
+ADDINS_PACKAGES_CONFIG=$ADDINS_DIR/packages.config
+MODULES_PACKAGES_CONFIG=$MODULES_DIR/packages.config
+
+# Define md5sum or md5 depending on Linux/OSX
+MD5_EXE=
+if [[ "$(uname -s)" == "Darwin" ]]; then
+    MD5_EXE="md5 -r"
+else
+    MD5_EXE="md5sum"
+fi
+
+# Define default arguments.
+SCRIPT="build.cake"
 TARGET="Default"
 CONFIGURATION="Release"
 VERBOSITY="verbose"
+DRYRUN=
+SHOW_VERSION=false
 SCRIPT_ARGUMENTS=()
 
-# parse arguments
+# Parse arguments.
 for i in "$@"; do
     case $1 in
+        -s|--script) SCRIPT="$2"; shift ;;
         -t|--target) TARGET="$2"; shift ;;
         -c|--configuration) CONFIGURATION="$2"; shift ;;
         -v|--verbosity) VERBOSITY="$2"; shift ;;
+        -d|--dryrun) DRYRUN="-dryrun" ;;
+        --version) SHOW_VERSION=true ;;
         --) shift; SCRIPT_ARGUMENTS+=("$@"); break ;;
         *) SCRIPT_ARGUMENTS+=("$1") ;;
     esac
     shift
 done
 
-SOLUTION_ROOT=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
-
-###########################################################################
-# Prepare .NET Core SDK
-###########################################################################
-
-DOTNET_VERSION="1.0.0-preview2-003121"
-DOTNET_INSTALLER_URI="https://raw.githubusercontent.com/dotnet/cli/rel/1.0.0-preview2/scripts/obtain/dotnet-install.sh"
-
-DOTNET_PATH=$SOLUTION_ROOT/.dotnet
-DOTNET_EXE=$DOTNET_PATH/dotnet
-DOTNET_VERSION_FOUND=""
-
-if [ -f "$DOTNET_EXE" ]; then
-
-    DOTNET_VERSION_FOUND=$("$DOTNET_EXE" --version)
-
-    echo "Found .NET Core SDK version $DOTNET_VERSION_FOUND"
+# Make sure the tools folder exist.
+if [ ! -d "$TOOLS_DIR" ]; then
+  mkdir "$TOOLS_DIR"
 fi
 
-if [[
-    # .NET Core SDK is not present
-    -z "$DOTNET_VERSION_FOUND" ||
-    # .NET Core SDK presents but is not of the version we want to go with
-    $DOTNET_VERSION != $DOTNET_VERSION_FOUND
-]]; then
-
-    echo "Installing .NET Core SDK version $DOTNET_VERSION"
-
-    if [ -d "$DOTNET_PATH" ]; then
-        rm -rf "$DOTNET_PATH"
+# Make sure that packages.config exist.
+if [ ! -f "$TOOLS_DIR/packages.config" ]; then
+    echo "Downloading packages.config..."
+    curl -Lsfo "$TOOLS_DIR/packages.config" http://cakebuild.net/download/bootstrapper/packages
+    if [ $? -ne 0 ]; then
+        echo "An error occured while downloading packages.config."
+        exit 1
     fi
+fi
 
-    if [ ! -d "$DOTNET_PATH" ]; then
-        mkdir "$DOTNET_PATH"
+# Download NuGet if it does not exist.
+if [ ! -f "$NUGET_EXE" ]; then
+    echo "Downloading NuGet..."
+    curl -Lsfo "$NUGET_EXE" https://dist.nuget.org/win-x86-commandline/latest/nuget.exe
+    if [ $? -ne 0 ]; then
+        echo "An error occured while downloading nuget.exe."
+        exit 1
     fi
-
-    # download installer script
-    curl -Lsfo "$DOTNET_PATH/dotnet-install.sh" "$DOTNET_INSTALLER_URI"
-
-    # .NET Core SDK is installed into local "DOTNET_PATH" folder
-    bash "$DOTNET_PATH/dotnet-install.sh" --version "$DOTNET_VERSION" --install-dir "$DOTNET_PATH" --no-path
 fi
 
-# make sure that .NET Core SDK has been installed
-if [ ! -f "$DOTNET_EXE" ]; then
-    echo "Could not find .NET Core SDK at '$DOTNET_EXE'"
-    exit 1
+# Restore tools from NuGet.
+pushd "$TOOLS_DIR" >/dev/null
+if [ ! -f "$PACKAGES_CONFIG_MD5" ] || [ "$( cat "$PACKAGES_CONFIG_MD5" | sed 's/\r$//' )" != "$( $MD5_EXE "$PACKAGES_CONFIG" | awk '{ print $1 }' )" ]; then
+    find . -type d ! -name . | xargs rm -rf
 fi
 
-export PATH="$DOTNET_PATH":$PATH
-export DOTNET_SKIP_FIRST_TIME_EXPERIENCE=1
-export DOTNET_CLI_TELEMETRY_OPTOUT=1
-
-###########################################################################
-# Prepare Cake and helper tools
-###########################################################################
-
-BUILD_PATH=$SOLUTION_ROOT/build
-TOOLS_PATH=$SOLUTION_ROOT/tools
-
-TOOLS_PROJECT_JSON=$TOOLS_PATH/project.json
-TOOLS_PROJECT_JSON_SRC=$BUILD_PATH/project_build_tools.json
-
-CAKE_FEED="https://api.nuget.org/v3/index.json"
-
-echo "Preparing Cake and build tools"
-
-if [ ! -d "$TOOLS_PATH" ]; then
-    echo "Creating tools directory"
-    mkdir "$TOOLS_PATH"
-fi
-
-echo "Copying project.json from $TOOLS_PROJECT_JSON_SRC"
-cp "$TOOLS_PROJECT_JSON_SRC" "$TOOLS_PROJECT_JSON"
-
-dotnet restore "$TOOLS_PATH" --packages "$TOOLS_PATH" --verbosity Warning -f "$CAKE_FEED"
+mono "$NUGET_EXE" install -ExcludeVersion
 if [ $? -ne 0 ]; then
-    echo "Error occured while installing Cake and build tools"
+    echo "Could not restore NuGet tools."
     exit 1
 fi
 
-CAKE_EXE=$( ls $TOOLS_PATH/Cake.CoreCLR/*/Cake.dll | sort | tail -n 1 )
+$MD5_EXE "$PACKAGES_CONFIG" | awk '{ print $1 }' >| "$PACKAGES_CONFIG_MD5"
 
-# make sure that Cake has been installed
+popd >/dev/null
+
+# Restore addins from NuGet.
+if [ -f "$ADDINS_PACKAGES_CONFIG" ]; then
+    pushd "$ADDINS_DIR" >/dev/null
+
+    mono "$NUGET_EXE" install -ExcludeVersion
+    if [ $? -ne 0 ]; then
+        echo "Could not restore NuGet addins."
+        exit 1
+    fi
+
+    popd >/dev/null
+fi
+
+# Restore modules from NuGet.
+if [ -f "$MODULES_PACKAGES_CONFIG" ]; then
+    pushd "$MODULES_DIR" >/dev/null
+
+    mono "$NUGET_EXE" install -ExcludeVersion
+    if [ $? -ne 0 ]; then
+        echo "Could not restore NuGet modules."
+        exit 1
+    fi
+
+    popd >/dev/null
+fi
+
+# Make sure that Cake has been installed.
 if [ ! -f "$CAKE_EXE" ]; then
     echo "Could not find Cake.exe at '$CAKE_EXE'."
     exit 1
 fi
 
-###########################################################################
-# Run build script
-###########################################################################
-
-exec dotnet "$CAKE_EXE" build.cake -verbosity=$VERBOSITY -configuration=$CONFIGURATION -target=$TARGET "${SCRIPT_ARGUMENTS[@]}"
+# Start Cake
+if $SHOW_VERSION; then
+    exec mono "$CAKE_EXE" -version
+else
+    exec mono "$CAKE_EXE" $SCRIPT -verbosity=$VERBOSITY -configuration=$CONFIGURATION -target=$TARGET $DRYRUN "${SCRIPT_ARGUMENTS[@]}"
+fi

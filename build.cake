@@ -1,76 +1,78 @@
-// load scripts to support build session
-#load "./build/parameters.cs"
+#tool nuget:?package=OpenCover&version=4.6.519
+#tool nuget:?package=ReportGenerator&version=2.5.8
 
-var parameters = BuildParameters.GetParameters(Context);
-var publishingError = false;
+var target = Context.Argument("target", "Default");
 
-Setup(context =>
+var configuration =
+    HasArgument("Configuration") ? Argument<string>("Configuration") :
+    EnvironmentVariable("Configuration") != null ? EnvironmentVariable("Configuration") : "Release";
+
+var buildSystem = Context.BuildSystem();
+
+var isLocalBuild = buildSystem.IsLocalBuild;
+var isRunningOnAppVeyor = buildSystem.AppVeyor.IsRunningOnAppVeyor;
+var isRunningOnWindows = Context.IsRunningOnWindows();
+
+var isPullRequest = buildSystem.AppVeyor.Environment.PullRequest.IsPullRequest;
+var isBuildTagged = IsBuildTagged(buildSystem);
+
+var buildNumber =
+    HasArgument("BuildNumber") ? Argument<int>("BuildNumber") :
+    isRunningOnAppVeyor ? AppVeyor.Environment.Build.Number :
+    EnvironmentVariable("BuildNumber") != null ? int.Parse(EnvironmentVariable("BuildNumber")) : 0;
+
+var artifactsDir = Directory("./artifacts");
+var testResultsDir = Directory("./artifacts/test-results");
+var nugetDir = System.IO.Path.Combine(artifactsDir, "nuget");
+
+//
+// Tasks
+//
+
+Task("Info")
+    .Does(() =>
 {
-    parameters.Initialize(context);
+    Information("Target: {0}", target);
+    Information("Configuration: {0}", configuration);
+    Information("Build number: {0}", buildNumber);
 
-    Information("Building version {0} of SharpBlueprint.Client ({1}, {2}, IsTagged: {3})",
-    parameters.Version.SemVersion,
-    parameters.Configuration,
-    parameters.Target,
-    parameters.IsTagged);
+    var projects = GetFiles("./src/**/*.csproj");
+
+    foreach (var project in projects) {
+        Information("{0} version: {1}", project.GetFilenameWithoutExtension(), GetVersion(project.FullPath));
+    }
 });
 
 Task("Clean")
     .Does(() =>
 {
-    CleanDirectories(parameters.Paths.Directories.ToClean);
+    CleanDirectory(artifactsDir);
 });
 
-Task("Patch-Project-Json")
-    .IsDependentOn("Clean")
+Task("Restore-Packages")
     .Does(() =>
 {
-    var projects = GetFiles("./src/**/project.json");
-    foreach(var project in projects)
-    {
-        if(!parameters.Version.PatchProjectJson(project)) {
-            Warning("No version specified in {0}.", project.FullPath);
-        }
-    }
-});
-
-Task("Restore-NuGet-Packages")
-    .IsDependentOn("Clean")
-    .Does(() =>
-{
-    DotNetCoreRestore("./", new DotNetCoreRestoreSettings
-    {
-        Verbose = false,
-        Verbosity = DotNetCoreRestoreVerbosity.Warning,
-        Sources = new [] {
-            "https://api.nuget.org/v3/index.json"
-        }
-    });
+    DotNetCoreRestore();
 });
 
 Task("Build")
-    .IsDependentOn("Patch-Project-Json")
-    .IsDependentOn("Restore-NuGet-Packages")
+    .IsDependentOn("Info")
+    .IsDependentOn("Clean")
+    .IsDependentOn("Restore-Packages")
     .Does(() =>
 {
-    var srcProjects = GetFiles("./src/**/*.xproj");
-    foreach(var project in srcProjects)
-    {
-        Information(project.FullPath);
-        DotNetCoreBuild(project.GetDirectory().FullPath, new DotNetCoreBuildSettings {
-            VersionSuffix = parameters.Version.DotNetAsterix,
-            Configuration = parameters.Configuration
-        });
-    }
+    var projects = GetFiles("./src/**/*.csproj");
+    projects.Add(GetFiles("./test/**/*.csproj"));
 
-    var testProjects = GetFiles("./test/**/*.xproj");
-    foreach(var project in testProjects)
+    foreach (var project in projects)
     {
-        Information(project.FullPath);
-        DotNetCoreBuild(project.GetDirectory().FullPath, new DotNetCoreBuildSettings {
-            VersionSuffix = parameters.Version.DotNetAsterix,
-            Configuration = parameters.Configuration
-        });
+        DotNetCoreBuild(project.FullPath,
+            new DotNetCoreBuildSettings
+            {
+                Configuration = configuration,
+                ArgumentCustomization = args => args.Append("/p:DebugType=full /p:DebugSymbols=True")
+            }
+        );
     }
 });
 
@@ -78,241 +80,263 @@ Task("Run-Unit-Tests")
     .IsDependentOn("Build")
     .Does(() =>
 {
-    var projects = GetFiles("./test/**/*.Tests.xproj");
-    foreach(var project in projects)
-    {
-        if(IsRunningOnWindows())
-        {
-            var apiUrl = EnvironmentVariable("APPVEYOR_API_URL");
-            try
-            {
-                if (!string.IsNullOrEmpty(apiUrl))
-                {
-                    // Disable XUnit AppVeyorReporter see https://github.com/cake-build/cake/issues/1200
-                    System.Environment.SetEnvironmentVariable("APPVEYOR_API_URL", null);
-                }
+    var testProject = new FilePath("./test/SharpBlueprint.Client.Tests/SharpBlueprint.Client.Tests.csproj");
+    var workingDirectory = MakeAbsolute(new DirectoryPath("./test/SharpBlueprint.Client.Tests")).FullPath;
 
-                Action<ICakeContext> testAction = tool => {
-                    tool.DotNetCoreTest(project.GetDirectory().FullPath, new DotNetCoreTestSettings {
-                        Configuration = parameters.Configuration,
-                        NoBuild = true,
-                        Verbose = true,
-                        ArgumentCustomization = args =>
-                            args.Append("-xml").Append(parameters.Paths.Directories.TestResults.CombineWithFilePath(project.GetFilenameWithoutExtension()).FullPath + ".xml")
-                    });};
+    var testActions = new List<Action<ICakeContext>>();
+    var dotnetCmd = isRunningOnWindows ? "dotnet.exe" : "dotnet";
 
-                if(!parameters.SkipOpenCover)
-                {
-                    OpenCover(testAction,
-                        parameters.Paths.Files.TestCoverageOutputFilePath,
-                        new OpenCoverSettings {
-                            ReturnTargetCodeOffset = 0,
-                            MergeOutput = true,
-                            Register = "user"
-                        }
-                        .WithFilter("+[*]* -[nunit.*]* -[xunit.*]* -[*.Tests]*")
-                        .ExcludeByAttribute("*.ExcludeFromCodeCoverage*")
-                        .ExcludeByFile("*/*Designer.cs;*/*.g.cs;*/*.g.i.cs"));
-                }
-                else
-                {
-                    testAction(Context);
-                }
+    testActions.Add(tool => {
+        using (var process = tool.StartAndReturnProcess(
+            dotnetCmd,
+            new ProcessSettings {
+                Arguments = "xunit -f netcoreapp1.1 -nobuild -c " + configuration,
+                WorkingDirectory = workingDirectory
             }
-            finally
+        ))
+        {
+            process.WaitForExit();
+            if (process.GetExitCode() != 0)
+                throw new Exception("Tests for netcoreapp1.1 have failed!");
+        }
+    });
+
+    testActions.Add(tool => {
+        using (var process = tool.StartAndReturnProcess(
+            dotnetCmd,
+            new ProcessSettings {
+                Arguments = "xunit -f net452 -nobuild -noshadow -c " + configuration,
+                WorkingDirectory = workingDirectory
+            }
+        ))
+        {
+            process.WaitForExit();
+            if (process.GetExitCode() != 0)
+                throw new Exception("Tests for net452 have failed!");
+        }
+    });
+
+    EnsureDirectoryExists(testResultsDir);
+
+    // OpenCover works only on Windows
+    if (isRunningOnWindows)
+    {
+        var openCoverXml = MakeAbsolute(testResultsDir.Path.CombineWithFilePath("OpenCover").AppendExtension("xml"));;
+        var coverageReportDir = System.IO.Path.Combine(testResultsDir, "report");
+
+        var settings = new OpenCoverSettings
+        {
+            Register = "user",
+            ReturnTargetCodeOffset = 0,
+            WorkingDirectory = workingDirectory,
+            ArgumentCustomization =
+                args =>
+                    args.Append(
+                        "-skipautoprops -mergebyhash -mergeoutput -oldstyle -hideskipped:All")
+        }
+        .WithFilter("+[*]* -[xunit.*]* -[*.Tests]*")
+        .ExcludeByAttribute("*.ExcludeFromCodeCoverage*")
+        .ExcludeByFile("*/*Designer.cs;*/*.g.cs;*/*.g.i.cs");
+
+        foreach (var testAction in testActions)
+            OpenCover(testAction, openCoverXml, settings);
+
+        // for non-local build coverage is uploaded to codecov.io so no need to generate the report
+        if (FileExists(openCoverXml) && isLocalBuild)
+        {
+            ReportGenerator(openCoverXml, coverageReportDir,
+                new ReportGeneratorSettings {
+                    ArgumentCustomization = args => args.Append("-reporttypes:html")
+                }
+            );
+        }
+    }
+    else
+    {
+        foreach (var testAction in testActions)
+            testAction(Context);
+    }
+});
+
+Task("Publish-Coverage")
+    .IsDependentOn("Run-Unit-Tests")
+    .WithCriteria(() => !isLocalBuild && !isPullRequest)
+    .Does(() =>
+{
+    var openCoverXml = MakeAbsolute(testResultsDir.Path.CombineWithFilePath("OpenCover").AppendExtension("xml"));;
+    if (!FileExists(openCoverXml))
+        throw new Exception("Missing \"" + openCoverXml + "\" file");
+
+    UploadCoverageReport(Context, openCoverXml.FullPath);
+})
+.OnError(exception =>
+{
+    Information("Error: " + exception.Message);
+});
+
+Task("Create-Packages")
+    .IsDependentOn("Run-Unit-Tests")
+    .Does(() =>
+{
+    var projects = GetFiles("./src/**/*.csproj");
+
+    foreach (var project in projects)
+    {
+        DotNetCorePack(
+            project.GetDirectory().FullPath,
+            new DotNetCorePackSettings()
             {
-                if (!string.IsNullOrEmpty(apiUrl))
+                Configuration = configuration,
+                OutputDirectory = nugetDir,
+                ArgumentCustomization = args => args.Append("--include-symbols")
+            });
+    }
+});
+
+Task("Publish-MyGet")
+    .IsDependentOn("Create-Packages")
+    .WithCriteria(() => !isLocalBuild && !isPullRequest && !isBuildTagged)
+    .Does(() =>
+{
+    var serverUrl = EnvironmentVariable("MYGET_SERVER_URL");
+    if (string.IsNullOrEmpty(serverUrl))
+        throw new InvalidOperationException("Could not resolve MyGet server URL");
+
+    var apiKey = EnvironmentVariable("MYGET_API_KEY");
+    if (string.IsNullOrEmpty(apiKey))
+        throw new InvalidOperationException("Could not resolve MyGet API key");
+
+    var packages = GetFiles(nugetDir + "/*.nupkg");
+
+    NuGetPush(packages, new NuGetPushSettings {
+        Source = serverUrl,
+        ApiKey = apiKey
+    });
+})
+.OnError(exception =>
+{
+    Information("Error: " + exception.Message);
+});
+
+Task("Publish-NuGet")
+    .IsDependentOn("Create-Packages")
+    .WithCriteria(() => !isLocalBuild && !isPullRequest && isBuildTagged)
+    .Does(() =>
+{
+    var serverUrl = EnvironmentVariable("NUGET_SERVER_URL");
+    if (string.IsNullOrEmpty(serverUrl))
+        throw new InvalidOperationException("Could not resolve NuGet server URL");
+
+    var apiKey = EnvironmentVariable("NUGET_API_KEY");
+    if (string.IsNullOrEmpty(apiKey))
+        throw new InvalidOperationException("Could not resolve NuGet API key");
+
+    var packages = GetFiles(nugetDir + "/*.nupkg");
+
+    NuGetPush(packages, new NuGetPushSettings {
+        Source = serverUrl,
+        ApiKey = apiKey
+    });
+})
+.OnError(exception =>
+{
+    Information("Error: " + exception.Message);
+});
+
+//
+// Targets
+//
+
+Task("Default")
+    .IsDependentOn("Create-Packages")
+    .IsDependentOn("Publish-Coverage")
+    .IsDependentOn("Publish-MyGet")
+    .IsDependentOn("Publish-NuGet");
+
+//
+// Run build
+//
+
+RunTarget(target);
+
+
+// **********************************************
+// ***               Utilities                ***
+// **********************************************
+
+/// <summary>
+/// Checks if build is tagged.
+/// </summary>
+private static bool IsBuildTagged(BuildSystem buildSystem)
+{
+    return buildSystem.AppVeyor.Environment.Repository.Tag.IsTag
+           && !string.IsNullOrWhiteSpace(buildSystem.AppVeyor.Environment.Repository.Tag.Name);
+}
+
+/// <summary>
+/// Gets version from "Version" node of csproj file.
+/// </summary>
+private static string GetVersion(string csproj)
+{
+    using (var reader = System.Xml.XmlReader.Create(csproj))
+    {
+        reader.MoveToContent();
+        while (reader.Read())
+            if (reader.NodeType == System.Xml.XmlNodeType.Element &&
+                reader.LocalName.Equals("Version", StringComparison.OrdinalIgnoreCase))
+                return reader.ReadElementContentAsString();
+    }
+    return null;
+}
+
+/// <summary>
+/// Uploads coverage report (OpenCover.xml) to codecov.io.
+/// </summary>
+public static void UploadCoverageReport(ICakeContext context, string openCoverXml)
+{
+    const string url = "https://codecov.io/upload/v2";
+
+    // query parameters: https://github.com/codecov/codecov-bash/blob/master/codecov#L1202
+    var queryBuilder = new System.Text.StringBuilder(url);
+    queryBuilder.Append("?package=bash-tbd&service=appveyor");
+    queryBuilder.Append("&branch=").Append(context.EnvironmentVariable("APPVEYOR_REPO_BRANCH"));
+    queryBuilder.Append("&commit=").Append(context.EnvironmentVariable("APPVEYOR_REPO_COMMIT"));
+    queryBuilder.Append("&build=").Append(context.EnvironmentVariable("APPVEYOR_JOB_ID"));
+    queryBuilder.Append("&pr=").Append(context.EnvironmentVariable("APPVEYOR_PULL_REQUEST_NUMBER"));
+    queryBuilder.Append("&job=").Append(context.EnvironmentVariable("APPVEYOR_ACCOUNT_NAME"));
+    queryBuilder.Append("%2F").Append(context.EnvironmentVariable("APPVEYOR_PROJECT_SLUG"));
+    queryBuilder.Append("%2F").Append(context.EnvironmentVariable("APPVEYOR_BUILD_VERSION"));
+    queryBuilder.Append("&token=").Append(context.EnvironmentVariable("CODECOV_TOKEN"));
+
+    var request = (System.Net.HttpWebRequest) System.Net.WebRequest.Create(queryBuilder.ToString());
+    request.Accept = "text/plain";
+    request.Method = "POST";
+
+    using (var requestStream = request.GetRequestStream())
+    using (var openCoverXmlStream = new System.IO.FileStream(openCoverXml, System.IO.FileMode.Open, System.IO.FileAccess.Read))
+    {
+        var buffer = new byte[1024];
+        int readBytes;
+        while ((readBytes = openCoverXmlStream.Read(buffer, 0, buffer.Length)) > 0)
+            requestStream.Write(buffer, 0, readBytes);
+    }
+
+    using (var response = (System.Net.HttpWebResponse) request.GetResponse())
+    {
+        if (response.StatusCode == System.Net.HttpStatusCode.OK)
+        {
+            using (var responseStream = response.GetResponseStream())
+            {
+                if (responseStream != null)
                 {
-                    System.Environment.SetEnvironmentVariable("APPVEYOR_API_URL", apiUrl);
+                    using (var responseStreamReader = new System.IO.StreamReader(responseStream))
+                        context.Information(responseStreamReader.ReadToEnd());
                 }
             }
         }
         else
         {
-            var name = project.GetFilenameWithoutExtension();
-            var dirPath = project.GetDirectory().FullPath;
-            var config = parameters.Configuration;
-            var xunit = GetFiles(dirPath + "/bin/" + config + "/net452/*/dotnet-test-xunit.exe").First().FullPath;
-            var testfile = GetFiles(dirPath + "/bin/" + config + "/net452/*/" + name + ".dll").First().FullPath;
-
-            using(var process = StartAndReturnProcess("mono", new ProcessSettings{ Arguments = xunit + " " + testfile }))
-            {
-                process.WaitForExit();
-                if (process.GetExitCode() != 0)
-                {
-                    throw new Exception("Mono tests failed!");
-                }
-            }
+            context.Information("Status code: " + response.StatusCode);
         }
     }
-
-    // Generate the HTML version of the Code Coverage report if the XML file exists
-    if(FileExists(parameters.Paths.Files.TestCoverageOutputFilePath))
-    {
-        ReportGenerator(parameters.Paths.Files.TestCoverageOutputFilePath, parameters.Paths.Directories.TestResults);
-    }
-});
-
-Task("Create-NuGet-Packages")
-    .IsDependentOn("Run-Unit-Tests")
-    .Does(() =>
-{
-    // Build libraries
-    var projects = GetFiles("./src/**/*.xproj");
-    foreach(var project in projects)
-    {
-        DotNetCorePack(project.GetDirectory().FullPath, new DotNetCorePackSettings {
-            VersionSuffix = parameters.Version.DotNetAsterix,
-            Configuration = parameters.Configuration,
-            OutputDirectory = parameters.Paths.Directories.NugetRoot,
-            NoBuild = true,
-            Verbose = false
-        });
-    }
-});
-
-Task("Upload-AppVeyor-Artifacts")
-    .IsDependentOn("Create-NuGet-Packages")
-    .WithCriteria(() => parameters.IsRunningOnAppVeyor)
-    .Does(() =>
-{
-    foreach(var package in GetFiles(parameters.Paths.Directories.NugetRoot + "/*"))
-    {
-        AppVeyor.UploadArtifact(package);
-    }
-});
-/*
-Task("Upload-Coverage-Report")
-    .WithCriteria(() => FileExists(parameters.Paths.Files.TestCoverageOutputFilePath))
-    .WithCriteria(() => !parameters.IsLocalBuild)
-    .WithCriteria(() => !parameters.IsPullRequest)
-    .IsDependentOn("Run-Unit-Tests")
-    .Does(() =>
-{
-    CoverallsIo(parameters.Paths.Files.TestCoverageOutputFilePath, new CoverallsIoSettings()
-    {
-        RepoToken = parameters.Coveralls.RepoToken
-    });
-});
-*/
-Task("Publish-MyGet")
-    .IsDependentOn("Package")
-    .WithCriteria(() => parameters.ShouldPublishToMyGet)
-    .Does(() =>
-{
-    // resolve MyGet API key
-    var apiKey = EnvironmentVariable("MYGET_API_KEY");
-    if(string.IsNullOrEmpty(apiKey)) {
-        throw new InvalidOperationException("Could not resolve MyGet API key.");
-    }
-
-    // resolve MyGet API url
-    var apiUrl = EnvironmentVariable("MYGET_API_URL");
-    if(string.IsNullOrEmpty(apiUrl)) {
-        throw new InvalidOperationException("Could not resolve MyGet API url.");
-    }
-
-    foreach(var package in parameters.Packages.Nuget)
-    {
-        // Push the package.
-        NuGetPush(package.PackagePath, new NuGetPushSettings {
-            Source = apiUrl,
-            ApiKey = apiKey
-        });
-    }
-})
-.OnError(exception =>
-{
-    Information("Error: " + exception.Message);
-    Information("Publish-MyGet Task failed, but continuing with next Task...");
-    publishingError = true;
-});
-
-Task("Publish-NuGet")
-    .IsDependentOn("Create-NuGet-Packages")
-    .WithCriteria(() => parameters.ShouldPublish)
-    .Does(() =>
-{
-    // resolve NuGet API key
-    var apiKey = EnvironmentVariable("NUGET_API_KEY");
-    if(string.IsNullOrEmpty(apiKey)) {
-        throw new InvalidOperationException("Could not resolve NuGet API key.");
-    }
-
-    // resolve NuGet API url
-    var apiUrl = EnvironmentVariable("NUGET_API_URL");
-    if(string.IsNullOrEmpty(apiUrl)) {
-        throw new InvalidOperationException("Could not resolve NuGet API url.");
-    }
-
-    foreach(var package in parameters.Packages.Nuget)
-    {
-        // push the package
-        NuGetPush(package.PackagePath, new NuGetPushSettings {
-          ApiKey = apiKey,
-          Source = apiUrl
-        });
-    }
-})
-.OnError(exception =>
-{
-    Information("Error: " + exception.Message);
-    Information("Publish-NuGet Task failed, but continuing with next Task...");
-    publishingError = true;
-});
-
-Task("Publish-GitHub-Release")
-    .WithCriteria(() => parameters.ShouldPublish)
-    .Does(() =>
-{
-    GitReleaseManagerClose(parameters.GitHub.UserName, parameters.GitHub.Password, "fairycode", "sharp-blueprint", parameters.Version.Milestone);
-})
-.OnError(exception =>
-{
-    Information("Error: " + exception.Message);
-    Information("Publish-GitHub-Release Task failed, but continuing with next Task...");
-    publishingError = true;
-});
-
-Task("Create-Release-Notes")
-    .Does(() =>
-{
-    GitReleaseManagerCreate(parameters.GitHub.UserName, parameters.GitHub.Password, "fairycode", "sharp-blueprint", new GitReleaseManagerCreateSettings {
-        Milestone         = parameters.Version.Milestone,
-        Name              = parameters.Version.Milestone,
-        Prerelease        = true,
-        TargetCommitish   = "main"
-    });
-});
-
-//
-// Task Targets
-//
-
-Task("Package")
-    .IsDependentOn("Create-NuGet-Packages");
-
-Task("Default")
-    .IsDependentOn("Package");
-
-Task("AppVeyor")
-    .IsDependentOn("Upload-AppVeyor-Artifacts")
-    /*.IsDependentOn("Upload-Coverage-Report")*/
-    .IsDependentOn("Publish-MyGet")
-    .IsDependentOn("Publish-NuGet")
-    .IsDependentOn("Publish-GitHub-Release")
-    .Finally(() =>
-{
-    if(publishingError)
-    {
-        throw new Exception("An error occurred during the publishing of Cake. All publishing tasks have been attempted.");
-    }
-});
-
-Task("ReleaseNotes")
-    .IsDependentOn("Create-Release-Notes");
-
-//
-// Run build tasks
-//
-RunTarget(parameters.Target);
+}

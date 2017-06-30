@@ -1,19 +1,30 @@
+environment:
+  CONFIGURATION: Release
+  TARGET: Default
+
+  NUGET_SERVER_URL: https://www.nuget.org/api/v2/package
+  NUGET_API_KEY:
+    secure: EA06oAdAgaBCIJtU3ArzLp8uYgXBtEtZXoBqQGhxvgOJcxiSahALa4cpn31H85eh
+
+  MYGET_SERVER_URL: https://www.myget.org/F/fairycode-ci/api/v2/package
+  MYGET_API_KEY:
+    secure: 0lDXR8Vfp0v0azE55fJ/gfXnZ9JfFcokOtBGJgaqGB1zYgzPX4H0op+rQEf3j6UE
+
+  CODECOV_TOKEN:
+    secure: Q6sycifK4eCUEg9j3RxCFRnOZszVF4Bc9Lmz6qZfoxQm/9toCwIhrYRt6yenOubW
+
 init:
   - git config --global core.autocrlf true
 
 build_script:
-  - ps: .\build.ps1 -Target "AppVeyor"
+  - ps: .\build.ps1 -target $env:TARGET -configuration $env:CONFIGURATION
 
-# tests are run by build scripts
+# tests are run by build script
 test: off
 
-# branches to build
 branches:
-  # whitelist
   only:
     - master
 
 cache:
-# invalidate cache if build.cake or build packages change
-- tools -> build.cake, build/project_build_tools.json
-- .dotnet -> build.cake
+- tools -> build.cake
