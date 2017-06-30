@@ -7,7 +7,7 @@
     <PackageId>SharpBlueprint.Client</PackageId>
     <TargetFrameworks>netstandard1.4;net452</TargetFrameworks>
     <Title>SharpBlueprint.Client</Title>
-    <Version>2.0.1</Version>
+    <Version>2.0.2</Version>
   </PropertyGroup>
 
 </Project>
