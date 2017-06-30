@@ -202,20 +202,31 @@ Task("Publish-MyGet")
     if (string.IsNullOrEmpty(serverUrl))
         throw new InvalidOperationException("Could not resolve MyGet server URL");
 
+    var symbolServerUrl = EnvironmentVariable("MYGET_SYMBOL_SERVER_URL");
+
     var apiKey = EnvironmentVariable("MYGET_API_KEY");
     if (string.IsNullOrEmpty(apiKey))
         throw new InvalidOperationException("Could not resolve MyGet API key");
 
     foreach (var package in GetFiles(nugetDir + "/*.nupkg"))
     {
-        // symbols packages are pushed alongside regular ones so no need to push them explicitly
         if (package.FullPath.EndsWith("symbols.nupkg", StringComparison.OrdinalIgnoreCase))
-            continue;
+        {
+            if (string.IsNullOrEmpty(symbolServerUrl))
+                continue;
 
-        NuGetPush(package.FullPath, new NuGetPushSettings {
-            Source = serverUrl,
-            ApiKey = apiKey
-        });
+            NuGetPush(package.FullPath, new NuGetPushSettings {
+                Source = symbolServerUrl,
+                ApiKey = apiKey
+            });
+        }
+        else
+        {
+            NuGetPush(package.FullPath, new NuGetPushSettings {
+                Source = serverUrl,
+                ApiKey = apiKey
+            });
+        }
     }
 })
 .OnError(exception =>
